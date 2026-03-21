@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crew Media Ops - Dashboard</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Crew Media Ops</h1>
+                <span class="version">v0.1.0</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#overview" class="nav-item active" data-section="overview">
+                    <span class="icon">📊</span>
+                    <span>概览</span>
+                </a>
+                <a href="#content" class="nav-item" data-section="content">
+                    <span class="icon">✍️</span>
+                    <span>内容创作</span>
+                </a>
+                <a href="#publish" class="nav-item" data-section="publish">
+                    <span class="icon">🚀</span>
+                    <span>发布管理</span>
+                </a>
+                <a href="#platforms" class="nav-item" data-section="platforms">
+                    <span class="icon">🌐</span>
+                    <span>平台管理</span>
+                </a>
+                <a href="#tasks" class="nav-item" data-section="tasks">
+                    <span class="icon">⚙️</span>
+                    <span>任务队列</span>
+                </a>
+                <a href="#analytics" class="nav-item" data-section="analytics">
+                    <span class="icon">📈</span>
+                    <span>数据分析</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="dot"></span>
+                    <span class="status-text">服务正常</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-title">
+                    <h2 id="page-title">概览</h2>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="showGenerateModal()">
+                        + 新建内容
+                    </button>
+                </div>
+            </header>
+
+            <!-- Overview Section -->
+            <section id="section-overview" class="section active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📝</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-posts">-</span>
+                            <span class="stat-label">总发布数</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👀</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-views">-</span>
+                            <span class="stat-label">总浏览量</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">❤️</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-engagement">-</span>
+                            <span class="stat-label">总互动量</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-followers">-</span>
+                            <span class="stat-label">新增粉丝</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-grid">
+                    <div class="card">
+                        <h3>平台分布</h3>
+                        <div id="platform-chart" class="chart-container">
+                            <div class="chart-placeholder">加载中...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>热点趋势</h3>
+                        <div id="trending-list" class="trending-list">
+                            <div class="loading">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Content Section -->
+            <section id="section-content" class="section">
+                <div class="card">
+                    <h3>内容草稿</h3>
+                    <div id="drafts-list" class="content-list">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Publish Section -->
+            <section id="section-publish" class="section">
+                <div class="card">
+                    <h3>发布记录</h3>
+                    <div id="publish-history" class="content-list">
+                        <div class="empty-state">暂无发布记录</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Platforms Section -->
+            <section id="section-platforms" class="section">
+                <div class="content-grid">
+                    <div class="card">
+                        <h3>国内平台</h3>
+                        <div id="domestic-platforms" class="platform-grid">
+                            <div class="loading">加载中...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>海外平台</h3>
+                        <div id="overseas-platforms" class="platform-grid">
+                            <div class="loading">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tasks Section -->
+            <section id="section-tasks" class="section">
+                <div class="card">
+                    <h3>任务队列</h3>
+                    <div id="tasks-list" class="task-list">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section id="section-analytics" class="section">
+                <div class="card">
+                    <h3>数据概览</h3>
+                    <div id="analytics-detail" class="analytics-detail">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Generate Content Modal -->
+    <div id="generate-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>生成内容</h3>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="generate-form" class="modal-body">
+                <div class="form-group">
+                    <label>选题主题</label>
+                    <input type="text" id="topic" placeholder="例如：AI 编程工具" required>
+                </div>
+                <div class="form-group">
+                    <label>关键词</label>
+                    <input type="text" id="keywords" placeholder="关键词，用逗号分隔">
+                </div>
+                <div class="form-group">
+                    <label>目标平台</label>
+                    <div class="platform-checkboxes" id="platform-checkboxes">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>风格</label>
+                    <select id="tone">
+                        <option value="professional">专业</option>
+                        <option value="casual">轻松</option>
+                        <option value="humorous">幽默</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">生成</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
