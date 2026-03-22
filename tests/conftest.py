@@ -943,3 +943,100 @@ def temp_config_file(tmp_path) -> str:
     with open(config_file, "w") as f:
         json.dump(config_data, f)
     return str(config_file)
+
+
+# =============================================================================
+# Security Test Fixtures (from CEO Review)
+# =============================================================================
+
+
+@pytest.fixture(scope="function")
+def test_user():
+    """测试用户。"""
+    from src.core.auth import User, UserRole
+    return User(
+        id="test-user-001",
+        username="testuser",
+        role=UserRole.USER,
+    )
+
+
+@pytest.fixture(scope="function")
+def test_admin():
+    """测试管理员。"""
+    from src.core.auth import User, UserRole
+    return User(
+        id="test-admin-001",
+        username="admin",
+        role=UserRole.ADMIN,
+    )
+
+
+@pytest.fixture(scope="function")
+def jwt_manager():
+    """JWT 管理器。"""
+    from src.core.auth import JWTManager
+    return JWTManager(
+        secret_key="test-secret-key-for-testing-only",
+        expires_in=3600,
+    )
+
+
+@pytest.fixture(scope="function")
+def encryption_manager():
+    """加密管理器。"""
+    from src.core.auth import EncryptionManager
+    return EncryptionManager()
+
+
+@pytest.fixture(scope="function")
+def mock_llm_response_for_content():
+    """Mock LLM 内容生成响应。"""
+    return {
+        "topic": "AI 编程工具",
+        "title": "5 个提升效率的 AI 编程工具",
+        "body": "本文介绍 5 个能显著提升编程效率的 AI 工具...\n\n1. Claude\n2. ChatGPT\n3. GitHub Copilot\n4. Cursor\n5. Tabnine",
+        "hashtags": ["AI", "编程", "效率工具"],
+        "images": [],
+    }
+
+
+@pytest.fixture(scope="function")
+def mock_hotspot_data():
+    """Mock 热点数据。"""
+    return [
+        {
+            "title": "AI 编程工具爆火",
+            "source": "weibo",
+            "score": 95.5,
+            "trend": "rising",
+            "url": "https://weibo.com/test-1",
+        },
+        {
+            "title": "Claude 4 发布",
+            "source": "zhihu",
+            "score": 88.2,
+            "trend": "stable",
+            "url": "https://zhihu.com/test-2",
+        },
+    ]
+
+
+# =============================================================================
+# Test Utility Functions
+# =============================================================================
+
+
+def assert_success_result(result):
+    """断言结果成功。"""
+    assert result.success is True
+    assert result.data is not None
+    assert result.error is None
+
+
+def assert_error_result(result, error_code: str = None):
+    """断言结果失败。"""
+    assert result.success is False
+    assert result.error is not None
+    if error_code:
+        assert result.error_code == error_code

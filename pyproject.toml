@@ -33,6 +33,11 @@ dependencies = [
     # Note: chromadb requires lancedb which doesn't support Windows
     # Use duckdb+ducktrie or sqlite for vector storage instead
     "duckdb>=1.0.0",
+    # Security dependencies
+    "cryptography>=44.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    # Redis for caching (optional but recommended)
+    "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]

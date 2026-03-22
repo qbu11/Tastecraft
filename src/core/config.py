@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import Any
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -54,8 +55,26 @@ class Settings(BaseSettings):
     PLAYWRIGHT_TIMEOUT: int = 30000
 
     # Security
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: str = "http://localhost:3000"
     INTERNAL_API_KEY: str = ""
+    JWT_EXPIRES_IN: int = 86400
+    ENCRYPTION_KEY: str = ""
+    AUDIT_LOGGING_ENABLED: bool = True
+    API_RATE_LIMIT: int = 60
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> str:
+        """Parse CORS_ORIGINS from comma-separated string."""
+        if isinstance(v, str):
+            return v
+        if isinstance(v, list):
+            return ",".join(v)
+        return str(v)
+
+    def get_cors_origins_list(self) -> list[str]:
+        """Get CORS origins as a list."""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
     # Content
     DEFAULT_LANGUAGE: str = "zh-CN"
