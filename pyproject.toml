@@ -38,6 +38,7 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     # Redis for caching (optional but recommended)
     "redis>=5.0.0",
+    "alembic>=1.18.4",
 ]
 
 [project.optional-dependencies]
