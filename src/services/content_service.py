@@ -63,7 +63,7 @@ class ContentService:
                 video_url=video_url,
                 hashtags=hashtags or [],
                 status=ContentStatus.DRAFT,
-                metadata=metadata or {},
+                extra_metadata=metadata or {},
                 created_at=datetime.utcnow(),
             )
 

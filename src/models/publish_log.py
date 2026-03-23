@@ -133,4 +133,4 @@ class PlatformPost(Base, TimestampMixin):
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     # Post Metadata (renamed to avoid SQLAlchemy reserved word)
-    post_metadata: Mapped[dict] = mapped_column("metadata", JSON, nullable=False)
+    post_metadata: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
