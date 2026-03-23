@@ -5,13 +5,13 @@ Hotspot Detection Crew Module
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from crewai import Process, Task
-from loguru import logger
 
 from src.agents import TopicResearcher
 from src.tools import hot_search_tool, trend_analysis_tool
+
 from .base_crew import BaseCrew, CrewInput, CrewResult, CrewStatus
 
 
@@ -27,8 +27,8 @@ class HotspotDetectionInput(CrewInput):
 
     def __init__(
         self,
-        keywords: List[str],
-        platforms: Optional[List[str]] = None,
+        keywords: list[str],
+        platforms: list[str] | None = None,
         limit: int = 20,
         **kwargs,
     ):
@@ -54,8 +54,8 @@ class HotspotDetectionResult(CrewResult):
     def __init__(
         self,
         status: CrewStatus,
-        hot_topics: Optional[List[Dict[str, Any]]] = None,
-        trend_report: Optional[Dict[str, Any]] = None,
+        hot_topics: list[dict[str, Any]] | None = None,
+        trend_report: dict[str, Any] | None = None,
         **kwargs,
     ):
         super().__init__(status=status, **kwargs)
@@ -92,8 +92,8 @@ class HotspotDetectionCrew(BaseCrew):
         verbose: bool = True,
         process: Process = Process.sequential,
         memory: bool = True,
-        max_rpm: Optional[int] = None,
-        llm: Optional[str] = None,
+        max_rpm: int | None = None,
+        llm: str | None = None,
     ):
         super().__init__(
             verbose=verbose,
@@ -110,7 +110,7 @@ class HotspotDetectionCrew(BaseCrew):
     def get_description(self) -> str:
         return "热点探测：多平台热点监控 + 趋势分析"
 
-    def get_agents(self) -> List[Any]:
+    def get_agents(self) -> list[Any]:
         researcher = TopicResearcher.create(
             tools=self._search_tools,
             verbose=self.verbose,
@@ -118,7 +118,7 @@ class HotspotDetectionCrew(BaseCrew):
         )
         return [researcher]
 
-    def get_tasks(self, inputs: CrewInput) -> List[Any]:
+    def get_tasks(self, inputs: CrewInput) -> list[Any]:
         agents = self.get_agents()
 
         keywords = inputs.inputs.get("keywords", [])
@@ -160,7 +160,7 @@ class HotspotDetectionCrew(BaseCrew):
 
         return [search_task]
 
-    def validate_inputs(self, inputs: CrewInput) -> tuple[bool, Optional[str]]:
+    def validate_inputs(self, inputs: CrewInput) -> tuple[bool, str | None]:
         keywords = inputs.inputs.get("keywords", [])
         if not keywords:
             return False, "keywords 参数不能为空"
@@ -173,7 +173,7 @@ class HotspotDetectionCrew(BaseCrew):
 
         return True, None
 
-    def _parse_outputs(self, outputs: Any) -> Dict[str, Any]:
+    def _parse_outputs(self, outputs: Any) -> dict[str, Any]:
         result = super()._parse_outputs(outputs)
 
         if hasattr(outputs, "tasks_output") and outputs.tasks_output:
@@ -184,7 +184,7 @@ class HotspotDetectionCrew(BaseCrew):
 
         return result
 
-    def _extract_task_output(self, task_output: Any) -> Dict[str, Any]:
+    def _extract_task_output(self, task_output: Any) -> dict[str, Any]:
         if hasattr(task_output, "raw"):
             output_str = task_output.raw
         elif hasattr(task_output, "result"):
@@ -215,5 +215,5 @@ class HotspotDetectionCrew(BaseCrew):
         )
 
     @classmethod
-    def create(cls, llm: Optional[str] = None, **kwargs) -> "HotspotDetectionCrew":
+    def create(cls, llm: str | None = None, **kwargs) -> "HotspotDetectionCrew":
         return cls(llm=llm, **kwargs)

@@ -4,16 +4,14 @@
 防止触发平台风控，控制发布频率
 """
 
+from collections import defaultdict
+from datetime import datetime, timedelta
 import json
 import logging
 from pathlib import Path
 from typing import Any
-from datetime import datetime, timedelta
-from collections import defaultdict
 
 import aiofiles
-
-from src.core.error_handling import Result, success, error
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +60,12 @@ class RateLimiter:
 
     async def load_history(self) -> None:
         """加载历史记录"""
-        for platform in self.LIMITS.keys():
+        for platform in self.LIMITS:
             history_file = self._get_history_file(platform)
             if history_file.exists():
                 try:
                     async with aiofiles.open(
-                        history_file, "r", encoding="utf-8"
+                        history_file, encoding="utf-8"
                     ) as f:
                         content = await f.read()
                         data = json.loads(content)
@@ -270,7 +268,7 @@ class RateLimiter:
             await self._save_history(platform)
             logger.info(f"已重置限流记录: {platform}")
         else:
-            for p in self.LIMITS.keys():
+            for p in self.LIMITS:
                 self.publish_history[p] = []
                 await self._save_history(p)
             logger.info("已重置所有平台的限流记录")

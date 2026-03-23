@@ -8,12 +8,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from src.services.image_generator import (
-    ImageGenerator,
-    generate_for_platform,
-    PLATFORM_CONFIGS,
     COLOR_SCHEMES,
-    Platform,
+    PLATFORM_CONFIGS,
     ColorScheme,
+    ImageGenerator,
+    Platform,
+    generate_for_platform,
 )
 
 router = APIRouter(prefix="/images", tags=["Images"])

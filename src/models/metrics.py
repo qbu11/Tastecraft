@@ -1,7 +1,7 @@
 """数据指标模型"""
 from uuid import uuid4
 
-from sqlalchemy import String, Integer, Float, ForeignKey, JSON
+from sqlalchemy import JSON, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.base import Base, TimestampMixin

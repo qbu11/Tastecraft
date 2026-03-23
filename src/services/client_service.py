@@ -5,8 +5,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.error_handling import Result, error, success
 from src.models.client import Client
-from src.core.error_handling import Result, success, error
 
 logger = logging.getLogger(__name__)
 

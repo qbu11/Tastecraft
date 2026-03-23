@@ -1,7 +1,7 @@
 """热点话题模型"""
 from uuid import uuid4
 
-from sqlalchemy import String, Integer, Float, Text, JSON
+from sqlalchemy import JSON, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.base import Base, TimestampMixin

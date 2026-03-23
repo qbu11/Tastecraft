@@ -2,9 +2,9 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
-from src.schemas.client import ClientCreate, ClientUpdate, ClientResponse
+from src.schemas.client import ClientCreate, ClientUpdate
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
 

@@ -5,18 +5,17 @@
 改写为异步，使用 MetricsService 存储数据。
 """
 
+from datetime import datetime
 import json
-import re
 import logging
-from datetime import datetime, timedelta
-from pathlib import Path
+import re
 from typing import Any
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.core.config import settings
-from src.core.error_handling import Result, success, error
+from src.core.error_handling import Result, error, success
 from src.models.metrics import Metrics
 from src.services.metrics_service import MetricsService
 

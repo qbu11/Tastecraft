@@ -1,16 +1,27 @@
 """FastAPI application entry point."""
 
-import logging
-from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from src.api.routes import (
+    accounts,
+    analytics,
+    clients,
+    content,
+    dashboard,
+    health,
+    images,
+    research,
+    search,
+    tasks,
+)
 from src.core.config import settings
-from src.api.routes import health, content, tasks, analytics, dashboard, research, search, clients, accounts, images
 from src.services.scheduler import HotspotScheduler
 
 logger = logging.getLogger(__name__)

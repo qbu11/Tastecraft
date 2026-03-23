@@ -6,10 +6,9 @@
 """
 
 import asyncio
+from collections.abc import Callable
 import logging
-from typing import Any, Callable
-
-from src.core.error_handling import retry_on_transient
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

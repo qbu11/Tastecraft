@@ -2,7 +2,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import String, Text, DateTime, JSON
+from sqlalchemy import JSON, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.base import Base, TimestampMixin

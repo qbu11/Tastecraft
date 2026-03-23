@@ -4,8 +4,8 @@
 使用 APScheduler 实现定时任务调度，集成 Service 层和 Crew。
 """
 
+from datetime import datetime
 import logging
-from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,12 +15,11 @@ from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.core.config import settings
-from src.core.error_handling import Result, success, error
-from src.services.client_service import ClientService
 from src.services.account_service import AccountService
+from src.services.client_service import ClientService
+from src.services.data_collector import get_data_collector
 from src.services.metrics_service import MetricsService
-from src.services.data_collector import DataCollector, get_data_collector
-from src.services.publish_engine_v2 import PublishEngineV2, get_publish_engine_v2
+from src.services.publish_engine_v2 import get_publish_engine_v2
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +120,7 @@ class HotspotScheduler:
                     keywords = [client.industry] if client.industry else []
 
                     try:
-                        from src.crew.crews import HotspotDetectionCrew, CrewInput
+                        from src.crew.crews import CrewInput, HotspotDetectionCrew
 
                         crew = HotspotDetectionCrew.create(
                             llm="openai/gpt-4o-mini",
@@ -178,7 +177,7 @@ class HotspotScheduler:
                         try:
                             from src.crew.crews import ContentCrew
 
-                            crew = ContentCrew.create(
+                            ContentCrew.create(
                                 llm="openai/gpt-4o-mini",
                                 verbose=False,
                             )
@@ -216,7 +215,7 @@ class HotspotScheduler:
 
         try:
             async with self.SessionLocal() as session:
-                metrics_service = MetricsService(session)
+                MetricsService(session)
 
                 # TODO: 从 ContentService 获取最近 7 天已发布内容
                 # 对每个内容调用 data_collector.collect_and_save()

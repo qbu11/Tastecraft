@@ -4,16 +4,15 @@ Cookie 管理模块
 负责管理多平台账号的 Cookie 持久化和登录态检测
 """
 
+from datetime import datetime, timedelta
 import json
 import logging
 from pathlib import Path
 from typing import Any
-from datetime import datetime, timedelta
 
 import aiofiles
 
-from src.core.config import settings
-from src.core.error_handling import Result, success, error
+from src.core.error_handling import Result, error, success
 from src.core.exceptions import CrewException
 
 logger = logging.getLogger(__name__)
@@ -139,7 +138,7 @@ class CookieManager:
                 logger.warning(f"Cookie 文件不存在: {platform}/{username}")
                 return error("Cookie 文件不存在", "COOKIE_NOT_FOUND")
 
-            async with aiofiles.open(cookie_file, "r", encoding="utf-8") as f:
+            async with aiofiles.open(cookie_file, encoding="utf-8") as f:
                 content = await f.read()
                 cookie_data = json.loads(content)
 
@@ -206,7 +205,7 @@ class CookieManager:
 
             for cookie_file in self.storage_dir.glob(pattern):
                 try:
-                    async with aiofiles.open(cookie_file, "r", encoding="utf-8") as f:
+                    async with aiofiles.open(cookie_file, encoding="utf-8") as f:
                         content = await f.read()
                         cookie_data = json.loads(content)
 
@@ -247,7 +246,7 @@ class CookieManager:
         try:
             for cookie_file in self.storage_dir.glob("*.json"):
                 try:
-                    async with aiofiles.open(cookie_file, "r", encoding="utf-8") as f:
+                    async with aiofiles.open(cookie_file, encoding="utf-8") as f:
                         content = await f.read()
                         cookie_data = json.loads(content)
 
@@ -289,7 +288,7 @@ class CookieManager:
             if not cookie_file.exists():
                 return error("Cookie 文件不存在", "COOKIE_NOT_FOUND")
 
-            async with aiofiles.open(cookie_file, "r", encoding="utf-8") as f:
+            async with aiofiles.open(cookie_file, encoding="utf-8") as f:
                 content = await f.read()
                 cookie_data = json.loads(content)
 
@@ -354,7 +353,7 @@ class CookieManager:
         summary = {}
 
         try:
-            for platform in self.PLATFORM_KEY_COOKIES.keys():
+            for platform in self.PLATFORM_KEY_COOKIES:
                 # 查找该平台的 Cookie 文件
                 pattern = f"{platform}_*.json"
                 cookie_files = list(self.storage_dir.glob(pattern))
@@ -363,7 +362,7 @@ class CookieManager:
                     # 取第一个（通常只有一个账号）
                     try:
                         async with aiofiles.open(
-                            cookie_files[0], "r", encoding="utf-8"
+                            cookie_files[0], encoding="utf-8"
                         ) as f:
                             content = await f.read()
                             data = json.loads(content)

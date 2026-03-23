@@ -1,19 +1,17 @@
 """Content database models."""
 
-import json
 from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import String, Text, JSON, Integer, ForeignKey, Unicode, DateTime
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from src.models.publish_log import PublishLog
     from src.models.analytics import Analytics
+    from src.models.publish_log import PublishLog
 
 
 class ContentType(str):

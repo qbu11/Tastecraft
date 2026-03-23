@@ -2,9 +2,9 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
-from src.schemas.account import AccountCreate, AccountUpdate, AccountResponse
+from src.schemas.account import AccountCreate, AccountUpdate
 
 router = APIRouter(prefix="/accounts", tags=["Accounts"])
 
