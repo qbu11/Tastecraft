@@ -9,15 +9,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from src.api.ws import socket_app
+
 from src.api.routes import (
     accounts,
+    agents,
     analytics,
     clients,
     content,
+    crew_execution,
     dashboard,
     health,
     images,
     research,
+    review,
+    schedule,
     search,
     tasks,
 )
@@ -71,15 +77,22 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health.router)
-app.include_router(content.router)
-app.include_router(tasks.router)
-app.include_router(analytics.router)
+app.include_router(agents.router)  # already has /api/v1 prefix
+app.include_router(content.router, prefix="/api/v1")
+app.include_router(tasks.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(dashboard.router)
-app.include_router(research.router)
-app.include_router(search.router)
-app.include_router(clients.router)
-app.include_router(accounts.router)
-app.include_router(images.router)
+app.include_router(research.router, prefix="/api/v1")
+app.include_router(search.router, prefix="/api/v1")
+app.include_router(clients.router, prefix="/api/v1")
+app.include_router(accounts.router, prefix="/api/v1")
+app.include_router(images.router, prefix="/api/v1")
+app.include_router(crew_execution.router, prefix="/api/v1")
+app.include_router(review.router, prefix="/api/v1")
+app.include_router(schedule.router, prefix="/api")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Mount Socket.IO at /ws
+app.mount("/ws", socket_app)

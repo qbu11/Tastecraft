@@ -6,12 +6,21 @@ Defines common interface for authentication, publishing, analytics, and scheduli
 """
 
 from abc import ABC, abstractmethod
+import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+import logging
+import random
+import time
 from typing import Any
 
 from ..base_tool import BaseTool, ToolResult, ToolStatus
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_CDP_PORT = 9222
+CDP_ENDPOINT_URL = "http://localhost:{port}"
 
 
 class ContentType(Enum):
@@ -182,6 +191,128 @@ class BasePlatformTool(BaseTool, ABC):
     max_tags: int = 10
     supported_content_types: list[ContentType] = [ContentType.TEXT, ContentType.IMAGE]
 
+    # ── Playwright CDP helpers ─────────────────────────────────────
+
+    def _get_cdp_port(self) -> int:
+        """Get CDP port from config, default 9222."""
+        return int(self.config.get("cdp_port", DEFAULT_CDP_PORT))
+
+    def _get_cdp_endpoint(self) -> str:
+        """Return the CDP endpoint URL for Playwright."""
+        return CDP_ENDPOINT_URL.format(port=self._get_cdp_port())
+
+    def _connect_browser(self) -> tuple[Any, Any]:
+        """
+        Connect to existing Chrome via Playwright CDP.
+
+        Returns a (browser, playwright_instance) tuple.
+        Caller must call browser.close() and playwright_instance.stop()
+        in a finally block.
+        """
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError as err:
+            raise RuntimeError(
+                "Playwright required. Install: pip install playwright && playwright install chromium"
+            ) from err
+
+        pw = sync_playwright().start()
+        try:
+            browser = pw.chromium.connect_over_cdp(self._get_cdp_endpoint())
+            return browser, pw
+        except Exception:
+            pw.stop()
+            raise
+
+    def _find_platform_page(self, browser: Any, url_fragment: str) -> Any:
+        """Find an existing page/tab in the connected browser matching url_fragment."""
+        for context in browser.contexts:
+            for page in context.pages:
+                if url_fragment in page.url:
+                    return page
+        if browser.contexts and browser.contexts[0].pages:
+            return browser.contexts[0].pages[0]
+        return None
+
+    def _random_delay(self, lo: float = 0.5, hi: float = 1.5) -> None:
+        """Human-like random delay between actions."""
+        time.sleep(random.uniform(lo, hi))
+
+    def _cleanup_browser(self, browser: Any, pw: Any) -> None:
+        """Safely close browser and playwright instance."""
+        if browser:
+            with contextlib.suppress(Exception):
+                browser.close()
+        if pw:
+            with contextlib.suppress(Exception):
+                pw.stop()
+
+    def check_login_via_playwright(
+        self,
+        url: str,
+        login_url_fragments: list[str] | None = None,
+    ) -> ToolResult:
+        """
+        Check login status by navigating to a URL and checking for login redirects.
+
+        Args:
+            url: Platform URL to navigate to
+            login_url_fragments: URL fragments that indicate a login page
+                (e.g., ["/login", "/signin"])
+
+        Returns:
+            ToolResult with authentication status
+        """
+        if login_url_fragments is None:
+            login_url_fragments = ["/login", "/signin"]
+
+        browser = None
+        pw = None
+        try:
+            browser, pw = self._connect_browser()
+            page = self._find_platform_page(browser, url.split("//")[-1].split("/")[0])
+            if not page:
+                return ToolResult(
+                    status=ToolStatus.FAILED,
+                    error=(
+                        f"No page found in Chrome (port {self._get_cdp_port()}). "
+                        f"Please open {url} in Chrome first."
+                    ),
+                    platform=self.platform,
+                )
+
+            page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            page.wait_for_timeout(3000)
+
+            current_url = page.url
+
+            for fragment in login_url_fragments:
+                if fragment in current_url:
+                    return ToolResult(
+                        status=ToolStatus.FAILED,
+                        error=(
+                            f"Not logged into {self.platform}. "
+                            f"Please log in at {url} first."
+                        ),
+                        platform=self.platform,
+                        data={"authenticated": False, "url": current_url},
+                    )
+
+            return ToolResult(
+                status=ToolStatus.SUCCESS,
+                data={"authenticated": True, "url": current_url},
+                platform=self.platform,
+            )
+
+        except Exception as e:
+            return ToolResult(
+                status=ToolStatus.FAILED,
+                error=f"Login check failed: {e!s}",
+                platform=self.platform,
+            )
+        finally:
+            self._cleanup_browser(browser, pw)
+
     @abstractmethod
     def authenticate(self) -> ToolResult:
         """
@@ -316,6 +447,14 @@ class BasePlatformTool(BaseTool, ABC):
             )
 
         return self.publish(content)
+
+    def _create_success_status(self) -> ToolStatus:
+        """Helper to create a success status."""
+        return ToolStatus.SUCCESS
+
+    def _create_failed_status(self) -> ToolStatus:
+        """Helper to create a failed status."""
+        return ToolStatus.FAILED
 
     def get_constraints(self) -> dict[str, Any]:
         """Get platform constraints"""
