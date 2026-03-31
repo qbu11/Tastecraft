@@ -50,9 +50,13 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Proxy API calls to backend (Railway internal networking)
+    # Dynamic DNS resolution — avoids nginx startup failure if backend not ready
+    resolver 8.8.8.8 valid=30s ipv6=off;
+    set $backend_upstream http://${BACKEND_HOST}:${BACKEND_PORT};
+
+    # Proxy API calls to backend
     location /api/ {
-        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+        proxy_pass $backend_upstream;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -61,7 +65,7 @@ server {
 
     # Proxy WebSocket
     location /ws/ {
-        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+        proxy_pass $backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
