@@ -15,7 +15,7 @@ class WebSocketService {
     if (this.socket?.connected) return
 
     this.socket = io(WS_URL, {
-      path: '/ws',
+      path: '/ws/socket.io',
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,

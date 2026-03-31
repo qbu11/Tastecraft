@@ -1,26 +1,31 @@
 # ==============================================================================
-# Crew Media Ops — Frontend Dockerfile (nginx for static dashboard)
+# Tastecraft 品匠 — Frontend Dockerfile (React + Vite + nginx)
 # ==============================================================================
-# Note: The dashboard is currently vanilla HTML/CSS/JS served from src/api/static/.
-# This Dockerfile provides a standalone nginx container for production.
-# When migrating to Next.js, replace with a node:20-alpine build stage.
 
+# --------------- Stage 1: Build React app ---------------
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# If a Next.js hotspot-dashboard exists, build it; otherwise copy static files.
-# This stage is a placeholder for future Next.js integration.
-COPY src/api/static/ ./static/
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# --------------- Production stage ---------------
+# Copy dependency files first (cache-friendly)
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source and build
+COPY frontend/ ./
+RUN pnpm build
+
+# --------------- Stage 2: Serve with nginx ---------------
 FROM nginx:alpine AS runtime
 
-# Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Copy custom nginx config
-COPY <<'NGINX_CONF' /etc/nginx/conf.d/crew.conf
+COPY <<'NGINX_CONF' /etc/nginx/conf.d/tastecraft.conf
 server {
     listen 3000;
     server_name _;
@@ -28,14 +33,13 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Gzip compression
     gzip on;
-    gzip_types text/plain text/css application/json application/javascript text/xml;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml;
     gzip_min_length 1000;
 
     # Static assets with long cache
-    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
-        expires 7d;
+    location /assets/ {
+        expires 1y;
         add_header Cache-Control "public, immutable";
     }
 
@@ -53,7 +57,16 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Proxy docs/redoc to backend
+    # Proxy WebSocket
+    location /ws/ {
+        proxy_pass http://backend:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+
+    # Proxy docs
     location /docs {
         proxy_pass http://backend:8000;
         proxy_set_header Host $host;
@@ -69,9 +82,8 @@ server {
 }
 NGINX_CONF
 
-# Copy static files from builder
-COPY --from=builder /app/static/ /usr/share/nginx/html/static/
-COPY --from=builder /app/static/index.html /usr/share/nginx/html/
+# Copy built files from builder
+COPY --from=builder /app/dist/ /usr/share/nginx/html/
 
 EXPOSE 3000
 

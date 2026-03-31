@@ -42,7 +42,7 @@ export function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">系统概览</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Crew Media Ops 运营中心
+          Tastecraft 品匠 运营中心
           {wsConnected && <span className="ml-2 text-green-500">● 实时连接</span>}
         </p>
       </div>

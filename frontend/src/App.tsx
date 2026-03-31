@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from './lib/queryClient'
 import { AppLayout } from './components/layout/AppLayout'
+import { LandingPage } from './pages/LandingPage'
+import { OnboardingPage } from './pages/OnboardingPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { AgentsPage } from './pages/AgentsPage'
 import { CrewsPage } from './pages/CrewsPage'
@@ -22,9 +24,14 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          {/* Landing Page — 独立布局，不走 AppLayout */}
+          <Route index element={<LandingPage />} />
+          <Route path="onboarding" element={<OnboardingPage />} />
+
+          {/* Dashboard + 后台页面 — AppLayout 带 Sidebar */}
           <Route element={<AppLayout />}>
+            <Route path="dashboard" element={<DashboardPage />} />
             {/* 系统监控 */}
-            <Route index element={<DashboardPage />} />
             <Route path="agents" element={<AgentsPage />} />
             <Route path="crews" element={<CrewsPage />} />
             <Route path="tasks" element={<TasksPage />} />

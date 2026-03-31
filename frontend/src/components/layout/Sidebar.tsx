@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 
 const monitorItems = [
-  { to: '/', icon: LayoutDashboard, label: '概览' },
+  { to: '/dashboard', icon: LayoutDashboard, label: '概览' },
   { to: '/agents', icon: Bot, label: 'Agent 监控' },
   { to: '/crews', icon: GitBranch, label: 'Crew 编排' },
   { to: '/tasks', icon: ListTodo, label: '任务队列' },
@@ -52,7 +52,7 @@ function NavSection({ title, items }: { title: string; items: typeof monitorItem
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/'}
+            end={item.to === '/dashboard'}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
@@ -94,7 +94,7 @@ export function Sidebar() {
         <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4">
           <div className="flex items-center gap-2">
             <Bot className="h-6 w-6 text-blue-600" />
-            <span className="text-lg font-semibold text-gray-900">Crew Ops</span>
+            <span className="text-lg font-semibold text-gray-900">Tastecraft</span>
           </div>
           <button onClick={toggleSidebar} className="lg:hidden">
             <X className="h-5 w-5 text-gray-500" />

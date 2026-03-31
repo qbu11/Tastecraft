@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.zeabur.app/template.json",
+  "name": "Tastecraft 品匠",
+  "description": "AI-powered multi-platform content operations system",
+  "services": [
+    {
+      "name": "backend",
+      "template": "PREBUILT",
+      "source": {
+        "image": "ghcr.io/tastecraft/backend:latest"
+      },
+      "ports": [8000],
+      "env": {
+        "APP_ENV": "production",
+        "API_HOST": "0.0.0.0",
+        "API_PORT": "8000",
+        "LOG_LEVEL": "INFO"
+      }
+    },
+    {
+      "name": "frontend",
+      "template": "PREBUILT",
+      "source": {
+        "image": "ghcr.io/tastecraft/frontend:latest"
+      },
+      "ports": [3000],
+      "domainKey": "ZEABUR_WEB_URL"
+    },
+    {
+      "name": "postgres",
+      "template": "POSTGRESQL"
+    }
+  ]
+}
