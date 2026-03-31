@@ -130,6 +130,8 @@ temp/
 .local/
 .localrc
 .gstack/
+.omc/
+.chats/
 
 # Temporary artifacts (screenshots, generated images, etc.)
 screenshots/
