@@ -26,9 +26,10 @@ FROM nginx:alpine AS runtime
 
 RUN rm /etc/nginx/conf.d/default.conf
 
-COPY <<'NGINX_CONF' /etc/nginx/conf.d/tastecraft.conf
+# Use template with env var substitution for Railway dynamic port
+COPY <<'NGINX_TMPL' /etc/nginx/templates/tastecraft.conf.template
 server {
-    listen 3000;
+    listen ${PORT};
     server_name _;
 
     root /usr/share/nginx/html;
@@ -49,9 +50,9 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Proxy API calls to backend (Zeabur internal networking)
+    # Proxy API calls to backend (Railway internal networking)
     location /api/ {
-        proxy_pass http://backend.zeabur.internal:8000;
+        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -60,21 +61,28 @@ server {
 
     # Proxy WebSocket
     location /ws/ {
-        proxy_pass http://backend.zeabur.internal:8000;
+        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
     }
 }
-NGINX_CONF
+NGINX_TMPL
 
 # Copy built files from builder
 COPY --from=builder /app/dist/ /usr/share/nginx/html/
 
+# Default env vars (Railway overrides PORT; set BACKEND_HOST in Railway dashboard)
+ENV PORT=3000 \
+    BACKEND_HOST=backend.railway.internal \
+    BACKEND_PORT=8000
+
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD wget -qO- http://localhost:3000/ || exit 1
+    CMD wget -qO- http://localhost:${PORT}/ || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+# envsubst replaces ${PORT}, ${BACKEND_HOST}, ${BACKEND_PORT} at startup
+# $uri and $host are nginx variables — must NOT be substituted
+CMD ["/bin/sh", "-c", "envsubst '${PORT} ${BACKEND_HOST} ${BACKEND_PORT}' < /etc/nginx/templates/tastecraft.conf.template > /etc/nginx/conf.d/tastecraft.conf && nginx -g 'daemon off;'"]
