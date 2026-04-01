@@ -29,6 +29,7 @@ from src.api.routes import (
     tasks,
 )
 from src.core.config import settings
+from src.db.init import init_db
 from src.services.scheduler import HotspotScheduler
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         settings.API_HOST,
         settings.API_PORT,
     )
+
+    await init_db()
 
     scheduler = HotspotScheduler()
     scheduler.start()
