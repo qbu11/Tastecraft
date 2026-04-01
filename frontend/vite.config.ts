@@ -5,7 +5,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: process.env.GITHUB_PAGES === 'true' ? '/media-crew/' : '/',
+  base: process.env.GITHUB_PAGES === 'true' ? '/Tastecraft/' : '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
