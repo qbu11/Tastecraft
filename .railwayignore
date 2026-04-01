@@ -1,0 +1,35 @@
+# Development files
+.git
+.github
+.vscode
+.idea
+*.pyc
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Frontend (deployed separately on GitHub Pages)
+frontend/
+node_modules/
+
+# Local data
+data/
+logs/
+generated_images/
+screenshots/
+reports/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+tests/
+.coverage
+htmlcov/
+
+# Environment
+.env.local
+.env.*.local

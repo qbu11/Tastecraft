@@ -46,17 +46,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         settings.API_PORT,
     )
 
-    scheduler = HotspotScheduler()
-    scheduler.start()
-    app.state.scheduler = scheduler
-    logger.info("Scheduler initialized")
+    # Try to start scheduler, but don't block if it fails
+    try:
+        scheduler = HotspotScheduler()
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("Scheduler initialized")
+    except Exception as e:
+        logger.warning("Scheduler initialization failed (non-blocking): %s", e)
+        app.state.scheduler = None
 
     yield
 
     logger.info("Crew Media Ops shutting down")
-    if hasattr(app.state, "scheduler"):
-        app.state.scheduler.shutdown()
-        logger.info("Scheduler stopped")
+    if hasattr(app.state, "scheduler") and app.state.scheduler:
+        try:
+            app.state.scheduler.shutdown()
+            logger.info("Scheduler stopped")
+        except Exception as e:
+            logger.warning("Scheduler shutdown failed: %s", e)
 
 
 app = FastAPI(
@@ -93,8 +101,12 @@ app.include_router(review.router, prefix="/api/v1")
 app.include_router(onboarding.router, prefix="/api/v1")
 app.include_router(schedule.router, prefix="/api")
 
-# Mount static files
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+# Mount static files (only if directory exists)
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    logger.info("Static files mounted at /static")
+else:
+    logger.warning("Static directory not found: %s", static_dir)
 
 # Mount Socket.IO at /ws
 app.mount("/ws", socket_app)

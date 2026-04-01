@@ -48,7 +48,7 @@ COPY alembic.ini ./
 COPY pyproject.toml ./
 
 # Create directories for runtime data
-RUN mkdir -p /app/data /app/logs /app/generated_images
+RUN mkdir -p /app/data /app/logs /app/generated_images /app/src/api/static
 
 # Non-root user for security
 RUN groupadd --gid 1000 crew && \
@@ -58,7 +58,9 @@ USER crew
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8000}/api/health || exit 1
+# Health check with longer start period for Railway
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
+# Startup script: run migrations then start server
+CMD ["sh", "-c", "alembic upgrade head 2>/dev/null || true && uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --timeout-keep-alive 75"]
