@@ -30,6 +30,8 @@ from src.api.routes import (
 )
 from src.core.config import settings
 from src.services.scheduler import HotspotScheduler
+from src.api.dependencies import engine
+import src.models  # noqa: F401 — ensure all models are registered with Base
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         settings.API_HOST,
         settings.API_PORT,
     )
+
+    # Initialize database tables
+    try:
+        from src.models.base import Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables initialized")
+    except Exception as e:
+        logger.error("Database initialization failed: %s", e)
+        raise
 
     # Try to start scheduler, but don't block if it fails
     try:
