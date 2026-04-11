@@ -20,7 +20,7 @@ def _pid_file() -> str:
     """Return path to the daemon PID file."""
     from tastecraft.core.config import get_settings
     settings = get_settings()
-    pid_dir = settings.base_dir
+    pid_dir = settings.home_dir
     pid_dir.mkdir(parents=True, exist_ok=True)
     return str(pid_dir / "daemon.pid")
 

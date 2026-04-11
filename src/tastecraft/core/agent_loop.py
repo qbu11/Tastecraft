@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, APIError, APIConnectionError
 from anthropic.types import Message
 
 from tastecraft.tools.base import BaseTool, ToolRegistry
@@ -61,7 +61,30 @@ async def agent_loop(
         if tool_schemas:
             kwargs["tools"] = tool_schemas
 
-        response: Message = await client.messages.create(**kwargs)
+        try:
+            response: Message = await client.messages.create(**kwargs)
+        except APIConnectionError as e:
+            logger.error("API connection failed: %s", e)
+            elapsed = time.monotonic() - start
+            return AgentResult(
+                success=False,
+                output=f"API connection failed: {e}",
+                turns=turn + 1,
+                tool_calls=total_tool_calls,
+                elapsed_seconds=elapsed,
+                messages=messages,
+            )
+        except APIError as e:
+            logger.error("API error (status %s): %s", e.status_code, e.message)
+            elapsed = time.monotonic() - start
+            return AgentResult(
+                success=False,
+                output=f"API error ({e.status_code}): {e.message}",
+                turns=turn + 1,
+                tool_calls=total_tool_calls,
+                elapsed_seconds=elapsed,
+                messages=messages,
+            )
 
         # Append assistant response
         messages.append({"role": "assistant", "content": response.content})
