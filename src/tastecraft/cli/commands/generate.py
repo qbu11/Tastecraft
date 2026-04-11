@@ -33,7 +33,10 @@ def generate(
         console.print(f"[red]Project '{project_id}' not found.[/red]")
         raise typer.Exit(1)
 
-    asyncio.run(_run_generate(settings, project_id, topic, mode, print_mode))
+    if mode == "collab":
+        asyncio.run(_run_collab(settings, project_id, topic))
+    else:
+        asyncio.run(_run_generate(settings, project_id, topic, mode, print_mode))
 
 
 async def _run_generate(
@@ -166,3 +169,16 @@ def _build_content_context(topic: str, mode: str) -> str:
             "marked as [USER_INPUT_REQUIRED: description] where user input is needed."
         )
     return "\n".join(parts)
+
+
+async def _run_collab(
+    settings: object,
+    project_id: str,
+    topic: str,
+) -> None:
+    """Launch interactive REPL session for collab mode."""
+    from tastecraft.cli.repl import run_repl
+    from tastecraft.core.config import Settings
+
+    assert isinstance(settings, Settings)
+    await run_repl(settings, project_id)
