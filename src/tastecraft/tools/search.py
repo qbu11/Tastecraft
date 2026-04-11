@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 _SKILL_DIR = Path.home() / ".claude" / "skills" / "union-search-skill"
 _UNION_SEARCH_SCRIPT = _SKILL_DIR / "scripts" / "union_search" / "union_search.py"
 _RSS_SEARCH_SCRIPT = _SKILL_DIR / "scripts" / "rss_search" / "rss_search.py"
-_RSS_FEEDS_FILE = _SKILL_DIR / "scripts" / "rss_search" / "rss_feeds.txt"
+# Prefer tastecraft's curated short list (fast), fall back to full skill list
+_RSS_FEEDS_FILE_FAST = Path.home() / ".tastecraft" / "rss_feeds.txt"
+_RSS_FEEDS_FILE_FULL = _SKILL_DIR / "scripts" / "rss_search" / "rss_feeds.txt"
 
 # Platform mapping for union-search --platforms flag
 _PLATFORM_MAP: dict[str, list[str]] = {
@@ -34,8 +36,8 @@ def _run_script(cmd: list[str], timeout: int = 30) -> list[dict[str, Any]]:
             cmd, capture_output=True, text=True, timeout=timeout,
         )
         if result.returncode != 0:
-            logger.warning("Script failed (exit %d): %s", result.returncode, result.stderr[:200])
-            return []
+            logger.warning("Script exited %d: %s", result.returncode, result.stderr[:200])
+            # Don't return early — stdout may still contain partial results
 
         stdout = result.stdout.strip()
         if not stdout:
@@ -196,11 +198,15 @@ class SearchTrendingTool(BaseTool):
             logger.info("rss_search.py not found at %s", _RSS_SEARCH_SCRIPT)
             return []
 
-        cmd = [sys.executable, str(_RSS_SEARCH_SCRIPT), query, "--json", "--limit", str(limit)]
-        if _RSS_FEEDS_FILE.exists():
-            cmd.extend(["--feeds", str(_RSS_FEEDS_FILE)])
+        cmd = [
+            sys.executable, str(_RSS_SEARCH_SCRIPT), query,
+            "--json", "--limit", str(limit), "--timeout", "15",
+        ]
+        feeds_file = _RSS_FEEDS_FILE_FAST if _RSS_FEEDS_FILE_FAST.exists() else _RSS_FEEDS_FILE_FULL
+        if feeds_file.exists():
+            cmd.extend(["--feeds", str(feeds_file)])
 
-        raw_items = _run_script(cmd, timeout=60)
+        raw_items = _run_script(cmd, timeout=30)
         topics: list[dict[str, Any]] = []
         for item in raw_items:
             title = str(item.get("title", "")).strip()

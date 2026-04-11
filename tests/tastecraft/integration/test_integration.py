@@ -44,7 +44,7 @@ class TestSearchTrendingIntegration:
             patch("tastecraft.tools.search.subprocess.run", side_effect=mock_run),
             patch("tastecraft.tools.search._UNION_SEARCH_SCRIPT") as mock_us,
             patch("tastecraft.tools.search._RSS_SEARCH_SCRIPT") as mock_rs,
-            patch("tastecraft.tools.search._RSS_FEEDS_FILE") as mock_ff,
+            patch("tastecraft.tools.search._RSS_FEEDS_FILE_FAST") as mock_ff,
         ):
             mock_us.exists.return_value = True
             mock_rs.exists.return_value = True

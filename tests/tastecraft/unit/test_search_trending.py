@@ -140,7 +140,7 @@ class TestSearchTrendingTool:
         with patch("tastecraft.tools.search._run_script", return_value=raw):
             with (
                 patch("tastecraft.tools.search._RSS_SEARCH_SCRIPT") as mock_script,
-                patch("tastecraft.tools.search._RSS_FEEDS_FILE") as mock_feeds,
+                patch("tastecraft.tools.search._RSS_FEEDS_FILE_FAST") as mock_feeds,
             ):
                 mock_script.exists.return_value = True
                 mock_feeds.exists.return_value = True

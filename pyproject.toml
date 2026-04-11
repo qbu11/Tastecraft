@@ -46,6 +46,7 @@ dependencies = [
     "aiofiles>=24.1.0",
     "markdown>=3.10.2",
     "python-socketio[asyncio]>=5.11.0",
+    "feedparser>=6.0.12",
 ]
 
 [project.optional-dependencies]
