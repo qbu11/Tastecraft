@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+*.db
+*.db-shm
+*.db-wal
+data/*.db
+tests/
+.git/
+.gitignore
