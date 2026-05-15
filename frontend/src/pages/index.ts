@@ -1,5 +1,6 @@
 export { Dashboard } from './Dashboard'
 export { Create } from './Create'
+export { Competitors } from './Competitors'
 export { Onboarding } from './Onboarding'
 export { Calendar } from './Calendar'
 export { Analytics } from './Analytics'

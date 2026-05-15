@@ -29,6 +29,41 @@ export interface AdjustStyleParams {
   styleParams: StyleParams
 }
 
+/* ── Variant Generation Types ── */
+
+export interface ContentVariant {
+  id: string
+  angle: string
+  hook: string
+  outline: string[]
+  tone: string
+}
+
+export interface VariantRequestParams {
+  topic: string
+  direction?: string
+  platform?: string
+  num_variants?: number
+  taste_context_ids?: string[]
+}
+
+export interface VariantResponse {
+  topic: string
+  platform: string
+  variants: ContentVariant[]
+}
+
+export interface ExpandVariantParams {
+  variant_id: string
+  topic: string
+  angle: string
+  hook: string
+  outline: string[]
+  tone: string
+  platform?: string
+  taste_context_ids?: string[]
+}
+
 /**
  * Start a streaming generation session.
  * Returns a ReadableStream via fetch (not axios, as axios doesn't support SSE well).
@@ -91,4 +126,45 @@ export async function sendCreativeChat(params: {
     suggestion?: { type: string; label: string; targetSection?: string }
   }>('/v1/generate/chat', params)
   return data
+}
+
+/* ── Variant Generation ── */
+
+/**
+ * Generate 2-3 content variants/approaches for a topic.
+ */
+export async function generateVariants(
+  params: VariantRequestParams,
+): Promise<VariantResponse> {
+  const { data } = await api.post<VariantResponse>(
+    '/v1/generate/variants',
+    params,
+  )
+  return data
+}
+
+/**
+ * Expand a chosen variant into full content via SSE streaming.
+ * Returns a fetch response + abort controller (not axios — SSE requires fetch).
+ */
+export function expandVariantStream(
+  params: ExpandVariantParams,
+  token?: string,
+): { response: Promise<Response>; abort: () => void } {
+  const controller = new AbortController()
+
+  const response = fetch('/api/v1/generate/expand-variant', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(params),
+    signal: controller.signal,
+  })
+
+  return {
+    response,
+    abort: () => controller.abort(),
+  }
 }

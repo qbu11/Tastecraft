@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   PenLine,
+  Users,
   CalendarDays,
   BarChart3,
   Settings,
@@ -19,6 +20,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: '/dashboard', label: '工作台', icon: LayoutDashboard },
   { to: '/create', label: '创作', icon: PenLine },
+  { to: '/competitors', label: '竞品', icon: Users },
   { to: '/calendar', label: '日历', icon: CalendarDays },
   { to: '/analytics', label: '数据', icon: BarChart3 },
   { to: '/settings', label: '设置', icon: Settings },

@@ -1,4 +1,5 @@
 export { MonthGrid, WeekView, ScheduleDialog } from './calendar'
 export { AppLayout, Sidebar } from './layout'
+export { NotificationBell, NotificationPanel } from './notifications'
 export { XHSLoginModal, SessionStatus } from './publish'
 export { TasteIndicator, TasteScore } from './taste'

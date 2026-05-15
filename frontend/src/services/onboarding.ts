@@ -50,6 +50,14 @@ export interface StyleAnalysis {
   summary: string
 }
 
+export interface ImportResult {
+  success: boolean
+  post_count: number
+  style_analysis: StyleAnalysis | null
+  style_features: string[]
+  error: string | null
+}
+
 // ── API Calls ──────────────────────────────────────────────────────────────
 
 export async function startOnboarding(
@@ -80,6 +88,19 @@ export async function importContent(
   const { data } = await api.post<StyleAnalysis>('/v1/onboarding/import-content', {
     session_id: sessionId,
     urls,
+  })
+  return data
+}
+
+export async function importFromProfile(
+  sessionId: string,
+  profileUrl: string,
+  platform?: string,
+): Promise<ImportResult> {
+  const { data } = await api.post<ImportResult>('/v1/onboarding/import-content', {
+    session_id: sessionId,
+    profile_url: profileUrl,
+    platform,
   })
   return data
 }

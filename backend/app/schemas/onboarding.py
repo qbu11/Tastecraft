@@ -22,10 +22,16 @@ class OnboardingMessage(BaseModel):
 
 
 class ContentImportRequest(BaseModel):
-    """Import user's existing content for style analysis."""
+    """Import user's existing content for style analysis.
+
+    v2: If profile_url is provided, auto-import all recent posts from the profile.
+    Otherwise, fall back to individual URL analysis.
+    """
 
     session_id: str
-    urls: list[str] = Field(..., min_length=1, max_length=20)
+    urls: list[str] = Field(default_factory=list, max_length=20)
+    profile_url: str | None = Field(None, description="User profile URL for auto-import (v2)")
+    platform: str | None = Field(None, description="Platform hint when using profile_url")
 
 
 class CompetitorAddRequest(BaseModel):
@@ -97,3 +103,13 @@ class OnboardingSessionResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ImportResult(BaseModel):
+    """Result of auto-importing content from a user profile (v2)."""
+
+    success: bool
+    post_count: int = 0
+    style_analysis: StyleAnalysis | None = None
+    style_features: list[str] = Field(default_factory=list)
+    error: str | None = None

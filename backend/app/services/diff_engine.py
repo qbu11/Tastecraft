@@ -1,14 +1,22 @@
-"""Core diff learning engine — captures edits and extracts taste signals."""
+"""Core diff learning engine — captures edits and extracts taste signals.
 
+v2: Adds confidence decay, conflict detection, and conflict resolution.
+"""
+
+import json
 import logging
+import uuid
+from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 
-from sqlalchemy import func, select
+import anthropic
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.taste_edit import TasteEdit
 from app.models.taste_preference import TastePreference
-from app.schemas.diff import EditClassification, EditType
+from app.schemas.diff import EditClassification, EditType, PreferenceConflict
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +132,235 @@ class DiffEngine:
             "platforms": platforms,
             "dimensions_covered": len(dimensions),
         }
+
+    # ── v2: Confidence Decay ──────────────────────────────────────────────
+
+    async def apply_confidence_decay(self, user_id: str) -> int:
+        """Apply time-based confidence decay to all preferences.
+
+        Preferences unused for 30+ days decay by 10% per week.
+        User-confirmed preferences are exempt from decay.
+        Returns number of preferences affected.
+        """
+        cutoff = datetime.utcnow() - timedelta(days=30)
+
+        # Fetch non-confirmed preferences that haven't been updated in 30+ days
+        result = await self._db.execute(
+            select(TastePreference).where(
+                TastePreference.user_id == int(user_id),
+                TastePreference.confirmed.is_(False),
+                TastePreference.updated_at < cutoff,
+                TastePreference.confidence > 0.05,  # Don't decay near-zero
+            )
+        )
+        stale_prefs = list(result.scalars().all())
+
+        affected = 0
+        now = datetime.utcnow()
+        for pref in stale_prefs:
+            # Calculate weeks since last update
+            days_stale = (now - pref.updated_at).days
+            weeks_stale = max(0, (days_stale - 30) // 7)
+            if weeks_stale <= 0:
+                continue
+
+            # Decay 10% per week, compounding
+            decay_factor = 0.9 ** weeks_stale
+            new_confidence = max(0.05, pref.confidence * decay_factor)
+
+            if abs(new_confidence - pref.confidence) > 0.001:
+                pref.confidence = round(new_confidence, 4)
+                pref.updated_at = now
+                affected += 1
+
+        if affected:
+            await self._db.flush()
+
+        logger.info(
+            "Applied confidence decay for user %s: %d preferences affected",
+            user_id,
+            affected,
+        )
+        return affected
+
+    # ── v2: Conflict Detection ─────────────────────────────────────────────
+
+    async def detect_conflicts(self, user_id: str) -> list[PreferenceConflict]:
+        """Find contradictory preferences.
+
+        e.g., edit #5 shortened paragraphs but edit #12 expanded them.
+        Uses Claude to determine if two preferences truly conflict.
+        """
+        result = await self._db.execute(
+            select(TastePreference)
+            .where(
+                TastePreference.user_id == int(user_id),
+                TastePreference.confidence > 0.2,  # Only consider meaningful prefs
+            )
+            .order_by(TastePreference.dimension, TastePreference.created_at)
+        )
+        preferences = list(result.scalars().all())
+
+        if len(preferences) < 2:
+            return []
+
+        # Group by dimension — conflicts are most likely within same dimension
+        by_dimension: dict[str, list[TastePreference]] = {}
+        for p in preferences:
+            by_dimension.setdefault(p.dimension, []).append(p)
+
+        # Collect candidate pairs (same dimension, different rules)
+        candidate_pairs: list[tuple[TastePreference, TastePreference]] = []
+        for dim_prefs in by_dimension.values():
+            if len(dim_prefs) < 2:
+                continue
+            for i, a in enumerate(dim_prefs):
+                for b in dim_prefs[i + 1 :]:
+                    if a.rule != b.rule:
+                        candidate_pairs.append((a, b))
+
+        if not candidate_pairs:
+            return []
+
+        # Use Claude to assess which pairs are true conflicts
+        conflicts: list[PreferenceConflict] = []
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+        # Batch pairs for efficient AI evaluation (max 10 pairs at a time)
+        for pair_batch in _chunks(candidate_pairs, 10):
+            pairs_text = "\n".join(
+                f"Pair {i+1}: Dimension={a.dimension}, "
+                f"Rule A (edit #{','.join(str(x) for x in (a.source_edit_ids or []))})=\"{a.rule}\" "
+                f"vs Rule B (edit #{','.join(str(x) for x in (b.source_edit_ids or []))})=\"{b.rule}\", "
+                f"Platform A={a.platform or 'any'}, Platform B={b.platform or 'any'}"
+                for i, (a, b) in enumerate(pair_batch)
+            )
+
+            system = """你是品味偏好分析专家。判断以下偏好对是否存在矛盾。
+
+对于每一对，判断：
+1. 是否真正矛盾（CONFLICT）还是可以共存（COMPATIBLE）
+2. 如果矛盾，是否可能因为平台不同而合理（CONTEXT_SPLIT）
+3. 建议的解决方式
+
+输出 JSON 数组：
+[
+  {
+    "pair_index": 1,
+    "verdict": "CONFLICT" | "COMPATIBLE" | "CONTEXT_SPLIT",
+    "explanation": "简短解释",
+    "suggested_resolution": "keep_first" | "keep_second" | "context_split" | "merge"
+  }
+]"""
+
+            try:
+                response = await client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=1024,
+                    system=system,
+                    messages=[{"role": "user", "content": f"分析以下偏好对：\n{pairs_text}"}],
+                )
+                # Parse response
+                import re
+
+                text = response.content[0].text
+                json_match = re.search(r"\[[\s\S]*\]", text)
+                if json_match:
+                    verdicts = json.loads(json_match.group())
+                    for v in verdicts:
+                        idx = v.get("pair_index", 0) - 1
+                        if 0 <= idx < len(pair_batch) and v.get("verdict") in (
+                            "CONFLICT",
+                            "CONTEXT_SPLIT",
+                        ):
+                            a, b = pair_batch[idx]
+                            conflicts.append(
+                                PreferenceConflict(
+                                    id=str(uuid.uuid4()),
+                                    preference_a_id=a.id,
+                                    preference_b_id=b.id,
+                                    preference_a_rule=a.rule,
+                                    preference_b_rule=b.rule,
+                                    preference_a_platform=a.platform,
+                                    preference_b_platform=b.platform,
+                                    dimension=a.dimension,
+                                    context=v.get("explanation", ""),
+                                    suggested_resolution=v.get(
+                                        "suggested_resolution", "keep_second"
+                                    ),
+                                )
+                            )
+            except Exception as e:
+                logger.error("Conflict detection AI call failed: %s", e)
+                continue
+
+        return conflicts
+
+    # ── v2: Conflict Resolution ────────────────────────────────────────────
+
+    async def resolve_conflict(
+        self, conflict_id: str, preference_a_id: int, preference_b_id: int,
+        resolution: str, context_note: str | None = None,
+    ) -> TastePreference | None:
+        """Resolve a conflict based on user choice.
+
+        resolution: 'keep_first' | 'keep_second' | 'context_split'
+        - keep_first: boost A, delete B
+        - keep_second: boost B, delete A
+        - context_split: keep both, annotate with platform context
+        """
+        a_result = await self._db.execute(
+            select(TastePreference).where(TastePreference.id == preference_a_id)
+        )
+        pref_a = a_result.scalar_one_or_none()
+
+        b_result = await self._db.execute(
+            select(TastePreference).where(TastePreference.id == preference_b_id)
+        )
+        pref_b = b_result.scalar_one_or_none()
+
+        if not pref_a or not pref_b:
+            return None
+
+        now = datetime.utcnow()
+        surviving: TastePreference | None = None
+
+        if resolution == "keep_first":
+            pref_a.confidence = min(0.95, pref_a.confidence + 0.15)
+            pref_a.confirmed = True
+            pref_a.updated_at = now
+            await self._db.delete(pref_b)
+            surviving = pref_a
+
+        elif resolution == "keep_second":
+            pref_b.confidence = min(0.95, pref_b.confidence + 0.15)
+            pref_b.confirmed = True
+            pref_b.updated_at = now
+            await self._db.delete(pref_a)
+            surviving = pref_b
+
+        elif resolution == "context_split":
+            # Both survive — mark them with context annotations
+            if context_note:
+                pref_a.rule = f"{pref_a.rule} [{context_note}]"
+                pref_b.rule = f"{pref_b.rule} [{context_note}]"
+            pref_a.confirmed = True
+            pref_b.confirmed = True
+            pref_a.updated_at = now
+            pref_b.updated_at = now
+            surviving = pref_a  # Return first one as representative
+
+        await self._db.flush()
+        logger.info(
+            "Resolved conflict %s: %s (a=%d, b=%d)",
+            conflict_id,
+            resolution,
+            preference_a_id,
+            preference_b_id,
+        )
+        return surviving
+
+    # ── Confidence Scoring ─────────────────────────────────────────────────
 
     def compute_confidence(self, edit_count: int) -> float:
         """Compute confidence score (0-1) for a pattern based on supporting edit count.
@@ -263,3 +500,12 @@ class DiffEngine:
                 ):
                     replacements.append(f"'{orig_segment}'→'{mod_segment}'")
         return replacements
+
+
+# ── Module-level Utilities ─────────────────────────────────────────────────
+
+
+def _chunks(lst: list, n: int):
+    """Yield successive n-sized chunks from a list."""
+    for i in range(0, len(lst), n):
+        yield lst[i : i + n]

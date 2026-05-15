@@ -9,7 +9,9 @@ from app.models.taste_preference import TastePreference
 from app.models.user import User
 from app.schemas.diff import (
     CaptureEditResponse,
+    ConflictResolution,
     EditCapture,
+    PreferenceConflict,
     TastePreferenceResponse,
     TasteSummary,
 )
@@ -259,4 +261,68 @@ async def get_taste_summary(
         "taste_score": summary["taste_score"],
         "platforms": summary["platforms"],
         "dimensions_covered": summary["dimensions_covered"],
+    }
+
+
+# ── v2: Conflict Detection & Resolution ────────────────────────────────────
+
+
+@router.get("/conflicts", response_model=list[PreferenceConflict])
+async def list_conflicts(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[PreferenceConflict]:
+    """Detect and list unresolved taste preference conflicts."""
+    engine = DiffEngine(db)
+    conflicts = await engine.detect_conflicts(str(current_user.id))
+    return conflicts
+
+
+@router.post("/conflicts/{conflict_id}/resolve")
+async def resolve_conflict(
+    conflict_id: str,
+    payload: ConflictResolution,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Resolve a detected taste preference conflict."""
+    if payload.resolution not in ("keep_first", "keep_second", "context_split"):
+        raise HTTPException(
+            status_code=400,
+            detail="resolution must be: keep_first, keep_second, or context_split",
+        )
+
+    engine = DiffEngine(db)
+    result = await engine.resolve_conflict(
+        conflict_id=conflict_id,
+        preference_a_id=payload.preference_a_id,
+        preference_b_id=payload.preference_b_id,
+        resolution=payload.resolution,
+        context_note=payload.context_note,
+    )
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Preference not found")
+
+    return {
+        "success": True,
+        "conflict_id": conflict_id,
+        "resolution": payload.resolution,
+        "surviving_preference_id": result.id,
+        "surviving_confidence": result.confidence,
+    }
+
+
+@router.post("/decay")
+async def trigger_confidence_decay(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Manually trigger confidence decay (admin/debug endpoint)."""
+    engine = DiffEngine(db)
+    affected = await engine.apply_confidence_decay(str(current_user.id))
+    return {
+        "success": True,
+        "preferences_affected": affected,
+        "message": f"Decay applied to {affected} preferences",
     }

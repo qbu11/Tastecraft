@@ -95,3 +95,65 @@ export async function uploadWeChatImage(
 export async function deleteWeChatDraft(mediaId: string): Promise<void> {
   await api.delete(`/v1/publish/wechat/${mediaId}`)
 }
+
+// ── Weibo Publish API ─────────────────────────────────────────────────────
+
+export interface WeiboPublishPayload {
+  content: string
+  images?: string[]
+}
+
+export interface WeiboPublishResponse {
+  success: boolean
+  post_id?: string | null
+  draft_id?: string | null
+  url?: string | null
+  status?: string | null
+  error?: string | null
+}
+
+export interface WeiboSessionStatus {
+  logged_in: boolean
+  platform: string
+  message: string
+}
+
+export interface WeiboInitLoginResponse {
+  qr_url?: string | null
+  ws_url?: string | null
+  message: string
+}
+
+export async function publishWeiboPost(
+  payload: WeiboPublishPayload,
+): Promise<WeiboPublishResponse> {
+  const { data } = await api.post<WeiboPublishResponse>(
+    '/v1/publish/weibo/publish',
+    payload,
+  )
+  return data
+}
+
+export async function saveWeiboDraft(
+  payload: WeiboPublishPayload,
+): Promise<WeiboPublishResponse> {
+  const { data } = await api.post<WeiboPublishResponse>(
+    '/v1/publish/weibo/draft',
+    payload,
+  )
+  return data
+}
+
+export async function getWeiboSessionStatus(): Promise<WeiboSessionStatus> {
+  const { data } = await api.get<WeiboSessionStatus>(
+    '/v1/publish/weibo/session-status',
+  )
+  return data
+}
+
+export async function initWeiboLogin(): Promise<WeiboInitLoginResponse> {
+  const { data } = await api.post<WeiboInitLoginResponse>(
+    '/v1/publish/weibo/init-login',
+  )
+  return data
+}

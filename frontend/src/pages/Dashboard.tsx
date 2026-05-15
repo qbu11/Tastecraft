@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { PenLine, TrendingUp, CheckCircle2, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { ConflictResolver, type PreferenceConflict } from '@/components/taste'
+import { getTasteConflicts, resolveTasteConflict } from '@/services/api'
 
 interface StatCardProps {
   label: string
@@ -50,6 +53,37 @@ const statusColor: Record<string, string> = {
 export function Dashboard() {
   const navigate = useNavigate()
   const displayName = useAuthStore((s) => s.user?.name) ?? '品味匠人'
+  const [conflicts, setConflicts] = useState<PreferenceConflict[]>([])
+  const [showConflicts, setShowConflicts] = useState(true)
+
+  // Fetch conflicts on mount
+  useEffect(() => {
+    getTasteConflicts()
+      .then((data) => setConflicts(data))
+      .catch(() => {
+        /* silent — conflicts are non-critical */
+      })
+  }, [])
+
+  async function handleResolveConflict(
+    conflictId: string,
+    resolution: 'keep_first' | 'keep_second' | 'context_split',
+    contextNote?: string,
+  ) {
+    const conflict = conflicts.find((c) => c.id === conflictId)
+    if (!conflict) return
+
+    await resolveTasteConflict(conflictId, {
+      conflict_id: conflictId,
+      preference_a_id: conflict.preference_a_id,
+      preference_b_id: conflict.preference_b_id,
+      resolution,
+      context_note: contextNote,
+    })
+
+    // Remove resolved conflict from local state
+    setConflicts((prev) => prev.filter((c) => c.id !== conflictId))
+  }
 
   return (
     <div className="space-y-8">
@@ -80,6 +114,21 @@ export function Dashboard() {
         <StatCard label="品味匹配度" value="87%" icon={TrendingUp} accent />
         <StatCard label="发布成功率" value="96%" icon={CheckCircle2} />
       </div>
+
+      {/* Taste conflicts alert (v2) */}
+      {conflicts.length > 0 && showConflicts && (
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-amber-200 bg-amber-50/50 p-5"
+        >
+          <ConflictResolver
+            conflicts={conflicts}
+            onResolve={handleResolveConflict}
+            onDismiss={() => setShowConflicts(false)}
+          />
+        </motion.section>
+      )}
 
       {/* Recent content */}
       <section>

@@ -14,6 +14,7 @@ from app.schemas.onboarding import (
     AIResponse,
     CompetitorAddRequest,
     ContentImportRequest,
+    ImportResult,
     OnboardingComplete,
     OnboardingMessage,
     OnboardingSessionResponse,
@@ -121,17 +122,43 @@ async def send_message(
     return response
 
 
-@router.post("/import-content", response_model=StyleAnalysis)
+@router.post("/import-content", response_model=StyleAnalysis | ImportResult)
 async def import_content(
     payload: ContentImportRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> StyleAnalysis:
-    """Accept content URLs for style analysis."""
+) -> StyleAnalysis | ImportResult:
+    """Accept content URLs or a profile URL for style analysis.
+
+    v2: If profile_url is provided, auto-import recent posts via TikHub.
+    Otherwise, fall back to individual URL analysis (v1 behavior).
+    """
     session = await _get_session(payload.session_id, current_user.id, db)
 
-    # TODO: In production, fetch actual content from URLs via TikHub API
-    # For now, use URLs as-is for analysis placeholder
+    # v2: Auto-import from profile URL
+    if payload.profile_url:
+        platform = payload.platform or _detect_platform_from_url(payload.profile_url)
+        if not platform:
+            raise HTTPException(
+                status_code=400,
+                detail="无法识别平台，请提供 platform 参数或使用标准主页链接",
+            )
+
+        result = await onboarding_engine.auto_import_from_profile(platform, payload.profile_url)
+
+        # Update session with results
+        if result.success and result.style_analysis:
+            session.imported_content_count = result.post_count
+            session.style_analysis = result.style_analysis.model_dump()
+            session.updated_at = datetime.utcnow()
+            await db.flush()
+
+        return result
+
+    # v1: Individual URL analysis
+    if not payload.urls:
+        raise HTTPException(status_code=400, detail="请提供 urls 或 profile_url")
+
     contents = payload.urls  # Would be fetched content in production
 
     # Run style analysis
@@ -145,6 +172,20 @@ async def import_content(
 
     await db.flush()
     return analysis
+
+
+def _detect_platform_from_url(url: str) -> str | None:
+    """Auto-detect platform from a profile URL."""
+    url_lower = url.lower()
+    if "xiaohongshu.com" in url_lower or "xhslink.com" in url_lower:
+        return "xiaohongshu"
+    if "weibo.com" in url_lower:
+        return "weibo"
+    if "zhihu.com" in url_lower:
+        return "zhihu"
+    if "douyin.com" in url_lower:
+        return "douyin"
+    return None
 
 
 @router.post("/add-competitors")

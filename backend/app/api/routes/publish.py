@@ -35,11 +35,14 @@ from app.schemas.publish import (
     WeChatDraftList,
     WeChatDraftListItem,
     WeChatDraftResponse,
+    WeiboPublishRequest,
+    WeiboPublishResponse,
     XHSPublishRequest,
     XHSPublishResponse,
 )
 from app.tools.platform.session_manager import SessionManager
 from app.tools.platform.wechat import WeChatPublisher
+from app.tools.platform.weibo import WeiboPublisher
 from app.tools.platform.xiaohongshu import XHSPublisher
 
 logger = logging.getLogger(__name__)
@@ -314,6 +317,115 @@ async def init_xhs_login(
         qr_url=qr_url or None,
         ws_url=None,
         message="Scan the QR code with the XHS mobile app to login"
+        if qr_url
+        else "Could not extract QR code — try opening the browser manually",
+    )
+
+
+# ── Weibo Helpers ──────────────────────────────────────────────────────────
+
+
+async def _get_weibo_publisher(user_id: int) -> WeiboPublisher:
+    """Create a WeiboPublisher with the user's profile directory."""
+    profile_dir = await _session_manager.get_or_create_profile(str(user_id), "weibo")
+    return WeiboPublisher(profile_dir=profile_dir)
+
+
+# ── Weibo Endpoints ────────────────────────────────────────────────────────
+
+
+@router.post("/weibo/draft", response_model=WeiboPublishResponse, status_code=201)
+async def save_weibo_draft(
+    payload: WeiboPublishRequest,
+    current_user: User = Depends(get_current_user),
+) -> WeiboPublishResponse:
+    """Save a post to the Weibo draft box (does not publish directly)."""
+    publisher = await _get_weibo_publisher(current_user.id)
+
+    try:
+        result = await publisher.save_as_draft(
+            content=payload.content,
+            images=payload.images or None,
+        )
+    except Exception as exc:
+        logger.exception("Weibo save draft failed")
+        return WeiboPublishResponse(success=False, error=str(exc))
+    finally:
+        await publisher.close()
+
+    return WeiboPublishResponse(**result)
+
+
+@router.post("/weibo/publish", response_model=WeiboPublishResponse)
+async def publish_weibo_post(
+    payload: WeiboPublishRequest,
+    current_user: User = Depends(get_current_user),
+) -> WeiboPublishResponse:
+    """Publish a post directly to Weibo."""
+    publisher = await _get_weibo_publisher(current_user.id)
+
+    try:
+        result = await publisher.publish_post(
+            content=payload.content,
+            images=payload.images or None,
+        )
+    except Exception as exc:
+        logger.exception("Weibo publish failed")
+        return WeiboPublishResponse(success=False, error=str(exc))
+    finally:
+        await publisher.close()
+
+    return WeiboPublishResponse(**result)
+
+
+@router.get("/weibo/session-status", response_model=LoginStatusResponse)
+async def weibo_session_status(
+    current_user: User = Depends(get_current_user),
+) -> LoginStatusResponse:
+    """Check whether the Weibo login session is still valid."""
+    publisher = await _get_weibo_publisher(current_user.id)
+
+    try:
+        logged_in = await publisher.check_login_status()
+        if logged_in:
+            await _session_manager.update_session_verified(str(current_user.id), "weibo")
+    except Exception as exc:
+        logger.warning("Weibo session check failed: %s", exc)
+        return LoginStatusResponse(
+            logged_in=False, platform="weibo", message=f"Check failed: {exc}"
+        )
+    finally:
+        await publisher.close()
+
+    return LoginStatusResponse(
+        logged_in=logged_in,
+        platform="weibo",
+        message="Session is valid" if logged_in else "Session expired — please re-login",
+    )
+
+
+@router.post("/weibo/init-login", response_model=InitLoginResponse)
+async def init_weibo_login(
+    current_user: User = Depends(get_current_user),
+) -> InitLoginResponse:
+    """Start the Weibo login flow.
+
+    Returns a QR code URL that the user can scan with the Weibo mobile app.
+    """
+    publisher = await _get_weibo_publisher(current_user.id)
+
+    try:
+        qr_url = await publisher.get_login_qr_url()
+    except Exception as exc:
+        logger.exception("Weibo init-login failed")
+        return InitLoginResponse(
+            message=f"Failed to start login: {exc}",
+        )
+
+    return InitLoginResponse(
+        qr_url=qr_url or None,
+        ws_url=None,
+        message="Scan the QR code with the Weibo mobile app to login"
         if qr_url
         else "Could not extract QR code — try opening the browser manually",
     )

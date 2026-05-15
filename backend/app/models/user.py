@@ -19,3 +19,6 @@ class User(Base):
     projects: Mapped[list["Project"]] = relationship(back_populates="user")  # noqa: F821
     contents: Mapped[list["Content"]] = relationship(back_populates="user")  # noqa: F821
     taste_edits: Mapped[list["TasteEdit"]] = relationship(back_populates="user")  # noqa: F821
+    analytics_entries: Mapped[list["Analytics"]] = relationship(back_populates="user")  # noqa: F821
+    notifications: Mapped[list["Notification"]] = relationship(back_populates="user")  # noqa: F821
+    competitors: Mapped[list["Competitor"]] = relationship(back_populates="user")  # noqa: F821

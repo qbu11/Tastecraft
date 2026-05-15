@@ -3,20 +3,23 @@
 Orchestrates a structured-but-adaptive interview flow:
 1. Lane Positioning — platforms, domain, audience, desired CTA
 2. Style Dialogue — tone samples, banned expressions, structure prefs
-3. Content Import — fetch & analyze existing content via TikHub
+3. Content Import — fetch & analyze existing content via TikHub (v2: auto-import from profile)
 4. Competitor Setup — async competitor analysis
 5. Aha Moment — generate first content piece with collected signals
 """
 
 import json
 import logging
+import re
 import uuid
+from collections import Counter
+from dataclasses import dataclass, field
 from datetime import datetime
 
 import anthropic
 
 from app.core.config import settings
-from app.schemas.onboarding import AIResponse, StyleAnalysis
+from app.schemas.onboarding import AIResponse, ImportResult, StyleAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -330,6 +333,225 @@ class OnboardingEngine:
         }
 
         return vault
+
+    # ── v2: Auto-Import from Profile ───────────────────────────────────────
+
+    async def auto_import_from_profile(
+        self, platform: str, profile_url: str
+    ) -> ImportResult:
+        """Auto-fetch user's recent posts from their profile URL via TikHub.
+
+        Steps:
+        1. Parse profile URL to extract user_id (platform-specific)
+        2. Fetch recent posts (last 50) via TikHub
+        3. Analyze all posts for style patterns
+        4. Generate comprehensive style analysis
+        5. Return analysis + post count + style features
+        """
+        from tikhub import Client as TikHubClient
+
+        parsed_id = self._parse_profile_url(platform, profile_url)
+        if not parsed_id:
+            return ImportResult(
+                success=False,
+                post_count=0,
+                style_analysis=None,
+                style_features=[],
+                error=f"无法从链接中提取用户 ID: {profile_url}",
+            )
+
+        # Fetch posts via TikHub
+        client = TikHubClient(api_key=settings.tikhub_api_key)
+        posts: list[str] = []
+
+        try:
+            if platform == "xiaohongshu":
+                resp = await client.xiaohongshu_web.get_user_notes_v2(user_id=parsed_id)
+                for note in (resp.get("data", {}).get("notes", []) or [])[:50]:
+                    title = note.get("display_title", "")
+                    desc = note.get("desc", "")
+                    posts.append(f"{title}\n{desc}" if title else desc)
+            elif platform == "weibo":
+                resp = await client.weibo_web.fetch_user_posts(uid=parsed_id)
+                for item in (resp.get("data", {}).get("list", []) or [])[:50]:
+                    posts.append(item.get("text_raw", "") or item.get("text", ""))
+            elif platform == "zhihu":
+                resp = await client.zhihu_web.fetch_user_articles(user_url_token=parsed_id)
+                for article in (resp.get("data", []) or [])[:50]:
+                    title = article.get("title", "")
+                    excerpt = article.get("excerpt", "")
+                    posts.append(f"{title}\n{excerpt}" if title else excerpt)
+            elif platform == "douyin":
+                resp = await client.douyin_web.fetch_user_posts(sec_uid=parsed_id)
+                for video in (resp.get("data", {}).get("aweme_list", []) or [])[:50]:
+                    posts.append(video.get("desc", ""))
+            else:
+                return ImportResult(
+                    success=False,
+                    post_count=0,
+                    style_analysis=None,
+                    style_features=[],
+                    error=f"不支持自动导入的平台: {platform}",
+                )
+        except Exception as e:
+            logger.error("TikHub fetch failed for %s/%s: %s", platform, parsed_id, e)
+            return ImportResult(
+                success=False,
+                post_count=0,
+                style_analysis=None,
+                style_features=[],
+                error=f"获取内容失败: {e}",
+            )
+
+        # Filter empty posts
+        posts = [p.strip() for p in posts if p and p.strip()]
+        if not posts:
+            return ImportResult(
+                success=False,
+                post_count=0,
+                style_analysis=None,
+                style_features=[],
+                error="未找到任何内容，请确认主页链接是否正确",
+            )
+
+        # Compute bulk style features locally
+        style_features = self._compute_bulk_style_features(posts)
+
+        # AI-powered deep analysis on combined content
+        style_analysis = await self.analyze_imported_content(posts)
+
+        return ImportResult(
+            success=True,
+            post_count=len(posts),
+            style_analysis=style_analysis,
+            style_features=style_features,
+            error=None,
+        )
+
+    def _parse_profile_url(self, platform: str, url: str) -> str | None:
+        """Extract user ID from a profile URL based on platform."""
+        url = url.strip()
+
+        if platform == "xiaohongshu":
+            # https://www.xiaohongshu.com/user/profile/5a1234567890abcdef
+            m = re.search(r"xiaohongshu\.com/user/profile/([a-zA-Z0-9]+)", url)
+            if m:
+                return m.group(1)
+            # Short links: https://xhslink.com/xxxxx — return raw for TikHub resolution
+            m = re.search(r"xhslink\.com/([a-zA-Z0-9]+)", url)
+            if m:
+                return m.group(1)
+
+        elif platform == "weibo":
+            # https://weibo.com/u/1234567890
+            m = re.search(r"weibo\.com/u/(\d+)", url)
+            if m:
+                return m.group(1)
+            # https://weibo.com/custom_name
+            m = re.search(r"weibo\.com/([a-zA-Z0-9_]+)", url)
+            if m:
+                return m.group(1)
+
+        elif platform == "zhihu":
+            # https://www.zhihu.com/people/some-url-token
+            m = re.search(r"zhihu\.com/people/([a-zA-Z0-9_-]+)", url)
+            if m:
+                return m.group(1)
+
+        elif platform == "douyin":
+            # https://www.douyin.com/user/MS4wLjAB...
+            m = re.search(r"douyin\.com/user/([a-zA-Z0-9_-]+)", url)
+            if m:
+                return m.group(1)
+
+        return None
+
+    def _compute_bulk_style_features(self, posts: list[str]) -> list[str]:
+        """Compute statistical style features from a batch of posts."""
+        features: list[str] = []
+
+        # Average paragraph length
+        all_paragraphs = []
+        for post in posts:
+            paragraphs = [p.strip() for p in post.split("\n") if p.strip()]
+            all_paragraphs.extend(paragraphs)
+        if all_paragraphs:
+            avg_para_len = sum(len(p) for p in all_paragraphs) / len(all_paragraphs)
+            if avg_para_len < 50:
+                features.append("短段落偏好（平均 < 50 字）")
+            elif avg_para_len > 150:
+                features.append("长段落偏好（平均 > 150 字）")
+            else:
+                features.append(f"中等段落长度（平均 {avg_para_len:.0f} 字）")
+
+        # Title patterns
+        question_count = 0
+        number_list_count = 0
+        statement_count = 0
+        for post in posts:
+            first_line = post.split("\n")[0].strip()
+            if "？" in first_line or "?" in first_line:
+                question_count += 1
+            elif re.search(r"\d+\s*(个|条|步|招|种|大|小)", first_line):
+                number_list_count += 1
+            else:
+                statement_count += 1
+
+        title_patterns = []
+        if question_count > len(posts) * 0.3:
+            title_patterns.append("提问式")
+        if number_list_count > len(posts) * 0.3:
+            title_patterns.append("数字列表式")
+        if statement_count > len(posts) * 0.3:
+            title_patterns.append("陈述式")
+        if title_patterns:
+            features.append(f"标题偏好: {', '.join(title_patterns)}")
+
+        # Common opening words/phrases (first 10 chars of each post)
+        openers = Counter()
+        for post in posts:
+            first_line = post.split("\n")[0].strip()
+            if len(first_line) >= 4:
+                openers[first_line[:4]] += 1
+        frequent_openers = [k for k, v in openers.most_common(5) if v >= 2]
+        if frequent_openers:
+            features.append(f"常用开头: {'、'.join(frequent_openers)}")
+
+        # Vocabulary uniqueness — words appearing >= 3 times across posts
+        all_text = " ".join(posts)
+        # Simple Chinese word frequency (2-4 char segments)
+        word_freq: Counter = Counter()
+        for post in posts:
+            for length in range(2, 5):
+                for i in range(len(post) - length + 1):
+                    segment = post[i : i + length]
+                    if segment.strip() and not segment.isspace():
+                        word_freq[segment] += 1
+        # Filter to meaningful frequent terms (appear in >= 3 posts)
+        post_presence: Counter = Counter()
+        for word, _ in word_freq.most_common(200):
+            count_in_posts = sum(1 for p in posts if word in p)
+            if count_in_posts >= 3:
+                post_presence[word] = count_in_posts
+        signature_words = [w for w, _ in post_presence.most_common(10)]
+        if signature_words:
+            features.append(f"高频词汇: {'、'.join(signature_words[:8])}")
+
+        # Content structure distribution
+        has_list = sum(1 for p in posts if re.search(r"[1-9][.、）)]", p))
+        has_emoji = sum(1 for p in posts if re.search(r"[\U0001F300-\U0001FAFF]", p))
+        has_hashtag = sum(1 for p in posts if "#" in p)
+        struct_notes = []
+        if has_list > len(posts) * 0.3:
+            struct_notes.append(f"列表结构 ({has_list}/{len(posts)})")
+        if has_emoji > len(posts) * 0.3:
+            struct_notes.append(f"使用 emoji ({has_emoji}/{len(posts)})")
+        if has_hashtag > len(posts) * 0.3:
+            struct_notes.append(f"使用话题标签 ({has_hashtag}/{len(posts)})")
+        if struct_notes:
+            features.append(f"内容结构: {', '.join(struct_notes)}")
+
+        return features
 
     # ── Private Methods ─────────────────────────────────────────────────────
 

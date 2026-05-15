@@ -152,3 +152,28 @@ class LoginStatusResponse(BaseModel):
     logged_in: bool
     platform: str
     message: str
+
+
+# ── Weibo Publish ──────────────────────────────────────────────────────────
+
+
+class WeiboPublishRequest(BaseModel):
+    """Request body for publishing a post to Weibo."""
+
+    content: str = Field(
+        ..., max_length=140, description="Post text (max 140 chars for regular posts)"
+    )
+    images: list[str] = Field(
+        default_factory=list, max_length=9, description="Image file paths (0-9)"
+    )
+
+
+class WeiboPublishResponse(BaseModel):
+    """Response from a Weibo publish or draft-save operation."""
+
+    success: bool
+    post_id: str | None = None
+    draft_id: str | None = None
+    url: str | None = None
+    status: str | None = None
+    error: str | None = None

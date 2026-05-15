@@ -199,6 +199,45 @@ export async function getTasteSummary() {
   return data
 }
 
+/* ── Taste Conflicts (v2) ── */
+
+interface PreferenceConflict {
+  id: string
+  preference_a_id: number
+  preference_b_id: number
+  preference_a_rule: string
+  preference_b_rule: string
+  preference_a_platform: string | null
+  preference_b_platform: string | null
+  dimension: string
+  context: string
+  suggested_resolution: string
+}
+
+export async function getTasteConflicts() {
+  const { data } = await api.get<PreferenceConflict[]>('/taste/conflicts')
+  return data
+}
+
+export async function resolveTasteConflict(
+  conflictId: string,
+  payload: {
+    conflict_id: string
+    preference_a_id: number
+    preference_b_id: number
+    resolution: string
+    context_note?: string
+  },
+) {
+  const { data } = await api.post(`/taste/conflicts/${conflictId}/resolve`, payload)
+  return data
+}
+
+export async function triggerConfidenceDecay() {
+  const { data } = await api.post('/taste/decay')
+  return data
+}
+
 /* ── Analytics ── */
 
 interface AnalyticsSummary {

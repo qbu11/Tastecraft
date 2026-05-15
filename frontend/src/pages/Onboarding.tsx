@@ -22,6 +22,7 @@ import {
   startOnboarding,
   sendMessage,
   importContent,
+  importFromProfile,
   addCompetitors,
   completeOnboarding,
 } from '@/services/onboarding'
@@ -143,23 +144,69 @@ function StyleSampleCard({
   )
 }
 
-function ImportSection({
-  onImport,
-  isLoading,
-}: {
-  onImport: (urls: string[]) => void
-  isLoading: boolean
-}) {
-  const [urls, setUrls] = useState('')
+// ── Platform detection helpers ────────────────────────────────────────────
 
-  const handleSubmit = () => {
-    const parsed = urls
+const PLATFORM_PATTERNS: Record<string, { regex: RegExp; label: string; icon: string }> = {
+  xiaohongshu: { regex: /xiaohongshu\.com|xhslink\.com/i, label: '小红书', icon: '📕' },
+  weibo: { regex: /weibo\.com/i, label: '微博', icon: '🔴' },
+  zhihu: { regex: /zhihu\.com/i, label: '知乎', icon: '🔵' },
+  douyin: { regex: /douyin\.com/i, label: '抖音', icon: '🎵' },
+}
+
+function detectPlatformFromUrl(url: string): { platform: string; label: string; icon: string } | null {
+  for (const [platform, info] of Object.entries(PLATFORM_PATTERNS)) {
+    if (info.regex.test(url)) {
+      return { platform, ...info }
+    }
+  }
+  return null
+}
+
+// ── Profile Import Section (v2 — primary) ─────────────────────────────────
+
+function ProfileImportSection({
+  onProfileImport,
+  onUrlImport,
+  isLoading,
+  importProgress,
+}: {
+  onProfileImport: (profileUrl: string, platform?: string) => void
+  onUrlImport: (urls: string[]) => void
+  isLoading: boolean
+  importProgress: string | null
+}) {
+  const [profileUrl, setProfileUrl] = useState('')
+  const [detectedPlatform, setDetectedPlatform] = useState<{
+    platform: string
+    label: string
+    icon: string
+  } | null>(null)
+  const [showManualImport, setShowManualImport] = useState(false)
+  const [manualUrls, setManualUrls] = useState('')
+
+  // Auto-detect platform from URL input
+  const handleProfileUrlChange = (value: string) => {
+    setProfileUrl(value)
+    if (value.trim()) {
+      setDetectedPlatform(detectPlatformFromUrl(value.trim()))
+    } else {
+      setDetectedPlatform(null)
+    }
+  }
+
+  const handleProfileSubmit = () => {
+    if (!profileUrl.trim() || isLoading) return
+    onProfileImport(profileUrl.trim(), detectedPlatform?.platform)
+  }
+
+  const handleManualSubmit = () => {
+    const parsed = manualUrls
       .split('\n')
       .map((u) => u.trim())
       .filter(Boolean)
     if (parsed.length > 0) {
-      onImport(parsed)
-      setUrls('')
+      onUrlImport(parsed)
+      setManualUrls('')
     }
   }
 
@@ -167,33 +214,149 @@ function ImportSection({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
+      className="space-y-3"
+    >
+      {/* Primary: Profile URL auto-import */}
+      <div className="rounded-xl border-2 border-[#c2714f]/30 bg-gradient-to-br from-[#c2714f]/5 to-transparent p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Upload size={16} className="text-[#c2714f]" />
+          <span className="text-sm font-medium text-stone-700">
+            粘贴你的主页链接
+          </span>
+          <span className="rounded-full bg-[#c2714f]/10 px-2 py-0.5 text-[10px] font-medium text-[#c2714f]">
+            推荐
+          </span>
+        </div>
+        <p className="mb-3 text-xs text-stone-500">
+          粘贴主页链接，AI 会自动获取你的近期内容并分析写作风格
+        </p>
+
+        <div className="relative mb-3">
+          <input
+            type="text"
+            value={profileUrl}
+            onChange={(e) => handleProfileUrlChange(e.target.value)}
+            placeholder="https://www.xiaohongshu.com/user/profile/..."
+            className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 pr-16 text-xs text-stone-700 placeholder-stone-400 outline-none focus:border-[#c2714f]/40"
+            disabled={isLoading}
+          />
+          {detectedPlatform && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-stone-600">
+              <span>{detectedPlatform.icon}</span>
+              <span>{detectedPlatform.label}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Progress indicator */}
+        {isLoading && importProgress && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="mb-3 flex items-center gap-2 rounded-lg bg-stone-50 px-3 py-2"
+          >
+            <motion.div
+              className="h-3 w-3 rounded-full border-2 border-[#c2714f] border-t-transparent"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            />
+            <span className="text-xs text-stone-600">{importProgress}</span>
+          </motion.div>
+        )}
+
+        <button
+          onClick={handleProfileSubmit}
+          disabled={!profileUrl.trim() || isLoading}
+          className="flex items-center gap-1.5 rounded-lg bg-[#c2714f] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#a85d3f] disabled:opacity-50"
+        >
+          <Link size={12} />
+          {isLoading ? '分析中...' : '自动导入并分析'}
+        </button>
+      </div>
+
+      {/* Secondary: Manual URL import (collapsible) */}
+      <button
+        onClick={() => setShowManualImport(!showManualImport)}
+        className="flex items-center gap-1 text-xs text-stone-400 transition-colors hover:text-stone-600"
+      >
+        <Plus size={10} />
+        {showManualImport ? '收起手动导入' : '或手动粘贴文章链接'}
+      </button>
+
+      <AnimatePresence>
+        {showManualImport && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden rounded-xl border border-stone-200 bg-white p-4"
+          >
+            <textarea
+              value={manualUrls}
+              onChange={(e) => setManualUrls(e.target.value)}
+              placeholder="每行一个文章链接..."
+              rows={3}
+              className="mb-3 w-full resize-none rounded-lg border border-stone-200 px-3 py-2 text-xs text-stone-700 placeholder-stone-400 outline-none focus:border-[#c2714f]/40"
+            />
+            <button
+              onClick={handleManualSubmit}
+              disabled={!manualUrls.trim() || isLoading}
+              className="flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
+            >
+              <Link size={12} />
+              {isLoading ? '分析中...' : '开始分析'}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+function StyleFeaturesDisplay({
+  features,
+  onConfirm,
+  onReject,
+}: {
+  features: string[]
+  onConfirm: () => void
+  onReject: () => void
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
       className="rounded-xl border border-stone-200 bg-white p-4"
     >
       <div className="mb-3 flex items-center gap-2">
-        <Upload size={16} className="text-[#c2714f]" />
+        <Sparkles size={16} className="text-[#c2714f]" />
         <span className="text-sm font-medium text-stone-700">
-          导入已有内容
+          发现的风格特征
         </span>
       </div>
-      <p className="mb-3 text-xs text-stone-500">
-        粘贴你的小红书主页链接或微信文章链接，AI
-        会分析你的写作风格
-      </p>
-      <textarea
-        value={urls}
-        onChange={(e) => setUrls(e.target.value)}
-        placeholder="每行一个链接，例如：&#10;https://www.xiaohongshu.com/user/profile/...&#10;https://mp.weixin.qq.com/s/..."
-        rows={3}
-        className="mb-3 w-full resize-none rounded-lg border border-stone-200 px-3 py-2 text-xs text-stone-700 placeholder-stone-400 outline-none focus:border-[#c2714f]/40"
-      />
-      <button
-        onClick={handleSubmit}
-        disabled={!urls.trim() || isLoading}
-        className="flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
-      >
-        <Link size={12} />
-        {isLoading ? '分析中...' : '开始分析'}
-      </button>
+      <div className="mb-4 space-y-2">
+        {features.map((feature, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs text-stone-600">
+            <Check size={12} className="mt-0.5 shrink-0 text-emerald-500" />
+            <span>{feature}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={onConfirm}
+          className="flex items-center gap-1 rounded-lg bg-stone-900 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-stone-800"
+        >
+          <Check size={12} />
+          很准确
+        </button>
+        <button
+          onClick={onReject}
+          className="flex items-center gap-1 rounded-lg border border-stone-200 px-4 py-2 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50"
+        >
+          有偏差，我来补充
+        </button>
+      </div>
     </motion.div>
   )
 }
@@ -281,6 +444,8 @@ export function Onboarding() {
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [showStyleSamples, setShowStyleSamples] = useState(false)
+  const [importProgress, setImportProgress] = useState<string | null>(null)
+  const [styleFeatures, setStyleFeatures] = useState<string[]>([])
 
   const {
     sessionId,
@@ -427,6 +592,64 @@ export function Onboarding() {
         timestamp: Date.now(),
       })
     } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleProfileImport(profileUrl: string, platform?: string) {
+    if (!sessionId) return
+    setLoading(true)
+    setImportProgress('正在连接平台获取内容...')
+    try {
+      const result = await importFromProfile(sessionId, profileUrl, platform)
+
+      if (!result.success) {
+        setImportProgress(null)
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `导入遇到问题：${result.error || '未知错误'}。你可以手动粘贴文章链接，或继续对话。`,
+          timestamp: Date.now(),
+          quickReplies: ['手动粘贴链接', '跳过这一步'],
+        })
+        return
+      }
+
+      setImportProgress(`正在分析你的 ${result.post_count} 篇内容...`)
+      await delay(500) // Brief visual pause
+
+      // Store style features for confirmation UI
+      if (result.style_features.length > 0) {
+        setStyleFeatures(result.style_features)
+      }
+
+      if (result.style_analysis) {
+        addImportedContent(
+          Array.from({ length: result.post_count }, (_, i) => `auto-import-${i}`),
+        )
+        setStyleAnalysis({
+          tone: result.style_analysis.tone,
+          summary: result.style_analysis.summary,
+        })
+
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `已分析你的 ${result.post_count} 篇内容！\n\n语气：${result.style_analysis.tone}\n结构偏好：${result.style_analysis.structure_preference}\n词汇水平：${result.style_analysis.vocabulary_level}\n\n总结：${result.style_analysis.summary}`,
+          timestamp: Date.now(),
+          quickReplies: ['很准确', '有些偏差，我来补充', '继续下一步'],
+        })
+      }
+    } catch {
+      addMessage({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '自动导入遇到网络问题，你可以手动粘贴文章链接或跳过。',
+        timestamp: Date.now(),
+        quickReplies: ['手动粘贴链接', '跳过这一步'],
+      })
+    } finally {
+      setImportProgress(null)
       setLoading(false)
     }
   }
@@ -647,9 +870,29 @@ export function Onboarding() {
               </motion.div>
             )}
 
-            {/* Import UI */}
+            {/* Import UI (v2: profile auto-import + manual fallback) */}
             {showImportUI && (
-              <ImportSection onImport={handleImport} isLoading={isLoading} />
+              <ProfileImportSection
+                onProfileImport={handleProfileImport}
+                onUrlImport={handleImport}
+                isLoading={isLoading}
+                importProgress={importProgress}
+              />
+            )}
+
+            {/* Style features confirmation (v2) */}
+            {styleFeatures.length > 0 && (
+              <StyleFeaturesDisplay
+                features={styleFeatures}
+                onConfirm={() => {
+                  setStyleFeatures([])
+                  handleSend('很准确，继续下一步')
+                }}
+                onReject={() => {
+                  setStyleFeatures([])
+                  handleSend('有偏差，我来补充')
+                }}
+              />
             )}
 
             {/* Competitor UI */}

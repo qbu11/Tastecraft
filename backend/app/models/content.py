@@ -25,3 +25,4 @@ class Content(Base):
     user: Mapped["User"] = relationship(back_populates="contents")  # noqa: F821
     project: Mapped["Project | None"] = relationship(back_populates="contents")  # noqa: F821
     taste_edits: Mapped[list["TasteEdit"]] = relationship(back_populates="content")  # noqa: F821
+    analytics_entries: Mapped[list["Analytics"]] = relationship(back_populates="content")  # noqa: F821

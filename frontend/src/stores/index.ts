@@ -1,4 +1,5 @@
 export { useAuthStore } from './authStore'
 export { useCalendarStore } from './calendarStore'
 export { useContentStore } from './contentStore'
+export { useNotificationStore } from './notificationStore'
 export { useOnboardingStore } from './onboardingStore'

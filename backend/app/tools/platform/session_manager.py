@@ -81,7 +81,7 @@ class SessionManager:
             └── sessions.json   # session health metadata
     """
 
-    SUPPORTED_PLATFORMS = ["xiaohongshu", "wechat"]
+    SUPPORTED_PLATFORMS = ["xiaohongshu", "wechat", "weibo"]
 
     def __init__(self, profiles_dir: Path | None = None) -> None:
         self.profiles_dir = profiles_dir or DEFAULT_PROFILES_DIR
