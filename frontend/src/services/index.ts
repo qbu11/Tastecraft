@@ -12,6 +12,15 @@ export {
 } from './api'
 
 export {
+  fetchCalendar,
+  scheduleContent,
+  rescheduleContent,
+  cancelSchedule,
+  fetchUpcoming,
+  fetchSuggestTimes,
+} from './calendar'
+
+export {
   startOnboarding,
   sendMessage,
   importContent,

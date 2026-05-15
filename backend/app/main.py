@@ -6,11 +6,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.auth import router as auth_router
+from app.api.routes.calendar import router as calendar_router
 from app.api.routes.content import router as content_router
 from app.api.routes.generate import router as generate_router
 from app.api.routes.onboarding import router as onboarding_router
+from app.api.routes.publish import router as publish_router
+from app.api.routes.session import router as session_router
 from app.api.routes.taste import router as taste_router
 from app.api.routes.vault import router as vault_router
+from app.api.routes.visual import router as visual_router
 from app.core.config import settings
 from app.core.database import engine
 
@@ -40,11 +44,15 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(calendar_router, prefix="/api/v1")
 app.include_router(content_router, prefix="/api/v1")
 app.include_router(generate_router, prefix="/api/v1")
 app.include_router(onboarding_router, prefix="/api/v1")
+app.include_router(publish_router, prefix="/api/v1")
+app.include_router(session_router, prefix="/api/v1")
 app.include_router(taste_router, prefix="/api/v1")
 app.include_router(vault_router, prefix="/api/v1")
+app.include_router(visual_router, prefix="/api/v1")
 
 
 @app.get("/health")
