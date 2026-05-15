@@ -22,8 +22,26 @@ async def generate_content(
     prompt: str,
     platform: str = "xiaohongshu",
     taste_context: str = "",
+    user_id: str | None = None,
+    project_slug: str | None = None,
 ) -> str:
+    """Generate content with vault-aware taste context.
+
+    If user_id and project_slug are provided but taste_context is empty,
+    automatically assembles context from the user's Taste Vault.
+    """
     client = _get_client()
+
+    # Auto-assemble vault context if not provided explicitly
+    if not taste_context and user_id and project_slug:
+        from app.services.taste_vault import TasteVault
+
+        vault = TasteVault(user_id=user_id, project_slug=project_slug)
+        if vault.exists():
+            taste_context = await vault.get_context_for_generation(
+                platform=platform,
+                topic=prompt[:100],
+            )
 
     system = SYSTEM_PROMPT
     if taste_context:

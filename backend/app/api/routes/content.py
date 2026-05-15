@@ -1,15 +1,23 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.models.content import Content
-from app.models.taste_edit import TasteEdit
 from app.models.user import User
 from app.schemas.content import ContentCreate, ContentList, ContentResponse, ContentUpdate
+from app.services.diff_engine import DiffEngine
+from app.services.pattern_extractor import PatternExtractor
 from app.tasks.celery_app import generate_content_task, publish_content_task
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/content", tags=["content"])
+
+# Trigger pattern extraction after this many accumulated edits
+_EXTRACTION_THRESHOLD = 3
 
 
 @router.post("/generate", status_code=202)
@@ -63,32 +71,50 @@ async def update_content(
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
 
+    engine = DiffEngine(db)
+    edits_captured = 0
+
     if payload.title is not None and payload.title != content.title:
-        edit = TasteEdit(
+        await engine.capture_edit(
             content_id=content.id,
             user_id=current_user.id,
-            original_text=content.title,
-            modified_text=payload.title,
-            diff_type="title",
+            original=content.title,
+            modified=payload.title,
             platform=content.platform,
         )
-        db.add(edit)
         content.title = payload.title
+        edits_captured += 1
 
     if payload.body is not None and payload.body != content.body:
-        edit = TasteEdit(
+        await engine.capture_edit(
             content_id=content.id,
             user_id=current_user.id,
-            original_text=content.body,
-            modified_text=payload.body,
-            diff_type="body",
+            original=content.body,
+            modified=payload.body,
             platform=content.platform,
         )
-        db.add(edit)
         content.body = payload.body
+        edits_captured += 1
 
     await db.flush()
     await db.refresh(content)
+
+    # Trigger pattern extraction if threshold reached
+    if edits_captured > 0:
+        total_edits = await engine.get_user_edit_count(current_user.id, content.platform)
+        if total_edits >= _EXTRACTION_THRESHOLD and total_edits % _EXTRACTION_THRESHOLD == 0:
+            try:
+                extractor = PatternExtractor(db)
+                await extractor.run_extraction_pipeline(current_user.id, content.platform)
+                logger.info(
+                    "Pattern extraction triggered for user %d (total_edits=%d)",
+                    current_user.id,
+                    total_edits,
+                )
+            except Exception as e:
+                # Pattern extraction is non-critical — don't fail the update
+                logger.warning("Pattern extraction failed: %s", e)
+
     return content
 
 

@@ -1,6 +1,8 @@
 from app.models.content import Content
+from app.models.onboarding_session import OnboardingSession
 from app.models.project import Project
 from app.models.taste_edit import TasteEdit
+from app.models.taste_preference import TastePreference
 from app.models.user import User
 
-__all__ = ["Content", "Project", "TasteEdit", "User"]
+__all__ = ["Content", "OnboardingSession", "Project", "TasteEdit", "TastePreference", "User"]

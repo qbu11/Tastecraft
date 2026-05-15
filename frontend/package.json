@@ -11,6 +11,12 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.10",
+    "@tiptap/extension-bubble-menu": "^3.23.4",
+    "@tiptap/extension-character-count": "^3.23.4",
+    "@tiptap/extension-highlight": "^3.23.4",
+    "@tiptap/extension-placeholder": "^3.23.4",
+    "@tiptap/react": "^3.23.4",
+    "@tiptap/starter-kit": "^3.23.4",
     "axios": "^1.16.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
