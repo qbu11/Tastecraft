@@ -24,7 +24,7 @@ from app.api.routes.demo import router as demo_router
 from app.api.routes.versions import router as versions_router
 from app.api.routes.visual import router as visual_router
 from app.core.config import settings
-from app.core.database import engine
+from app.core.database import create_tables, engine
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("TasteCraft backend starting — env=%s", settings.app_env)
+    await create_tables()
     yield
     await engine.dispose()
     logger.info("TasteCraft backend shutdown complete")

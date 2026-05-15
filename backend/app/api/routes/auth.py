@@ -19,7 +19,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def _create_access_token(user_id: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     return jwt.encode(
-        {"sub": user_id, "exp": expire},
+        {"sub": str(user_id), "exp": expire},
         settings.secret_key,
         algorithm=settings.algorithm,
     )
