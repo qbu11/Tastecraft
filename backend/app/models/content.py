@@ -26,3 +26,6 @@ class Content(Base):
     project: Mapped["Project | None"] = relationship(back_populates="contents")  # noqa: F821
     taste_edits: Mapped[list["TasteEdit"]] = relationship(back_populates="content")  # noqa: F821
     analytics_entries: Mapped[list["Analytics"]] = relationship(back_populates="content")  # noqa: F821
+    versions: Mapped[list["ContentVersion"]] = relationship(  # noqa: F821
+        back_populates="content", order_by="ContentVersion.version_number"
+    )

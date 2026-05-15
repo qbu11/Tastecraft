@@ -3,6 +3,9 @@
 This is the critical component that determines which vault documents are injected
 into each AI generation call. It operates within a strict token budget to avoid
 wasting context window on low-value information.
+
+Phase 1: Static context injection (always-inject + conditional).
+Phase 3: Dynamic RAG retrieval via VaultEmbeddingService.
 """
 
 from __future__ import annotations
@@ -104,7 +107,12 @@ class ContextHarness:
           - Topic related? -> pull relevant competitor entries
           - Has explicit rules? -> explicit-rules.md
 
-        Step 3: PRIORITY & TRIM
+        Step 3: DYNAMIC RAG (topic-aware semantic retrieval)
+          - If a topic is provided, search the vault for relevant sections
+          - Use TF-IDF cosine similarity to find matching vault content
+          - Inject top-k results within remaining token budget
+
+        Step 4: PRIORITY & TRIM
           - Hard rules (explicit-rules.md) > soft preferences
           - Recent edits > old edits
           - High confidence > low confidence
@@ -206,7 +214,12 @@ class ContextHarness:
                         )
                     )
 
-        # Step 3: Prioritize and trim
+        # Step 3: Dynamic RAG retrieval (topic-aware semantic search)
+        if topic:
+            rag_sections = await self._dynamic_retrieve(vault, topic, sections)
+            sections.extend(rag_sections)
+
+        # Step 4: Prioritize and trim
         return self._prioritize_and_trim(sections, self.MAX_CONTEXT_TOKENS)
 
     async def preview_context(
@@ -233,6 +246,47 @@ class ContextHarness:
             token_count=_estimate_tokens(context),
             documents_used=docs_used,
         )
+
+    async def _dynamic_retrieve(
+        self,
+        vault: "TasteVault",
+        topic: str,
+        existing_sections: list[ContextSection],
+    ) -> list[ContextSection]:
+        """RAG: search vault for topic-relevant sections via TF-IDF similarity.
+
+        Returns additional ContextSections that aren't already included from
+        the static injection steps.
+        """
+        from app.services.vault_embeddings import VaultEmbeddingService
+
+        embedding_service = VaultEmbeddingService()
+
+        try:
+            results = await embedding_service.search(vault.root, topic, top_k=3)
+        except Exception as e:
+            logger.warning("Dynamic RAG retrieval failed: %s", e)
+            return []
+
+        # Deduplicate: skip sections already included from static injection
+        existing_sources = {s.source_doc for s in existing_sections}
+        rag_sections: list[ContextSection] = []
+
+        for result in results:
+            # Skip if this source document is already in the context
+            if result.source_document in existing_sources:
+                continue
+
+            rag_sections.append(
+                ContextSection(
+                    name=f"rag: {result.section_title}",
+                    content=result.content,
+                    priority=3,  # Medium priority — between core and nice-to-have
+                    source_doc=result.source_document,
+                )
+            )
+
+        return rag_sections
 
     def _prioritize_and_trim(self, sections: list[ContextSection], budget: int) -> str:
         """Prioritize sections by importance and trim to budget.

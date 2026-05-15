@@ -45,3 +45,40 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+# ── Usage Guard Dependencies ──
+
+
+async def check_generate_limit(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Raise 402 if user has exceeded their plan's generation limit."""
+    from app.services.billing import BillingService
+
+    svc = BillingService(db)
+    result = await svc.check_usage_limit(current_user.id, "generate")
+    if not result.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=result.reason or "Generation limit exceeded",
+        )
+    return current_user
+
+
+async def check_publish_limit(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Raise 402 if user has exceeded their plan's publish limit."""
+    from app.services.billing import BillingService
+
+    svc = BillingService(db)
+    result = await svc.check_usage_limit(current_user.id, "publish")
+    if not result.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=result.reason or "Publish limit exceeded",
+        )
+    return current_user

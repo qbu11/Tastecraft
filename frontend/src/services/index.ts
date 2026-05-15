@@ -78,3 +78,23 @@ export type {
   NotificationList,
   UnreadCount,
 } from './notifications'
+
+export {
+  getSubscription,
+  subscribe,
+  upgradePlan,
+  cancelSubscription,
+  getUsageSummary,
+  getOverage,
+  getPlans,
+  createPayment,
+  getPaymentHistory,
+} from './billing'
+export type {
+  SubscriptionResponse,
+  UsageSummary,
+  OverageBill,
+  PlanInfo,
+  PaymentIntent,
+  PaymentRecord,
+} from './billing'

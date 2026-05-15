@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import check_publish_limit, get_current_user, get_db
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.publish import (
@@ -104,7 +104,8 @@ async def create_wechat_draft(
 @router.post("/wechat/publish/{media_id}", response_model=PublishStatus)
 async def publish_wechat_draft(
     media_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(check_publish_limit),
+    db: AsyncSession = Depends(get_db),
 ) -> PublishStatus:
     """Publish a draft (moves it from draft box to published articles)."""
     publisher = _get_wechat_publisher()
@@ -119,6 +120,13 @@ async def publish_wechat_draft(
             media_id=media_id,
             error=str(exc),
         )
+
+    # Record usage
+    from app.services.billing import BillingService
+
+    billing = BillingService(db)
+    await billing.record_usage(current_user.id, "publish")
+    await billing.record_usage(current_user.id, "platform", platform="wechat")
 
     return PublishStatus(
         status=PublishStatusEnum.SUCCESS,
@@ -246,7 +254,8 @@ async def save_xhs_draft(
 @router.post("/xhs/publish", response_model=XHSPublishResponse)
 async def publish_xhs_note(
     payload: XHSPublishRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(check_publish_limit),
+    db: AsyncSession = Depends(get_db),
 ) -> XHSPublishResponse:
     """Publish a note directly to Xiaohongshu."""
     publisher = await _get_xhs_publisher(current_user.id)
@@ -263,6 +272,14 @@ async def publish_xhs_note(
         return XHSPublishResponse(success=False, error=str(exc))
     finally:
         await publisher.close()
+
+    # Record usage on successful publish
+    if result.get("success"):
+        from app.services.billing import BillingService
+
+        billing = BillingService(db)
+        await billing.record_usage(current_user.id, "publish")
+        await billing.record_usage(current_user.id, "platform", platform="xiaohongshu")
 
     return XHSPublishResponse(**result)
 
@@ -359,7 +376,8 @@ async def save_weibo_draft(
 @router.post("/weibo/publish", response_model=WeiboPublishResponse)
 async def publish_weibo_post(
     payload: WeiboPublishRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(check_publish_limit),
+    db: AsyncSession = Depends(get_db),
 ) -> WeiboPublishResponse:
     """Publish a post directly to Weibo."""
     publisher = await _get_weibo_publisher(current_user.id)
@@ -374,6 +392,14 @@ async def publish_weibo_post(
         return WeiboPublishResponse(success=False, error=str(exc))
     finally:
         await publisher.close()
+
+    # Record usage on successful publish
+    if result.get("success"):
+        from app.services.billing import BillingService
+
+        billing = BillingService(db)
+        await billing.record_usage(current_user.id, "publish")
+        await billing.record_usage(current_user.id, "platform", platform="weibo")
 
     return WeiboPublishResponse(**result)
 

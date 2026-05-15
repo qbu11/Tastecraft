@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Save, Globe, Send as SendIcon } from 'lucide-react'
+import { ArrowLeft, Save, Globe, Send as SendIcon, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { TiptapEditor } from '@/components/editor/TiptapEditor'
 import { VariantPicker, type ContentVariant } from '@/components/editor/VariantPicker'
 import { CreativeChat, type ChatMessage } from '@/components/chat/CreativeChat'
 import { StyleControls, defaultStyles, type StyleParam } from '@/components/editor/StyleControls'
+import { VersionHistory } from '@/components/editor/VersionHistory'
 import { useStreamingGeneration } from '@/hooks/useStreamingGeneration'
 import {
   rewriteSection,
@@ -40,6 +41,10 @@ export function Create() {
   const [variants, setVariants] = useState<ContentVariant[]>([])
   const [isLoadingVariants, setIsLoadingVariants] = useState(false)
   const expandAbortRef = useRef<(() => void) | null>(null)
+
+  // Version history state
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false)
+  const [currentContentId] = useState<number | null>(null) // Set when content is saved/generated
 
   const { isGenerating, cancel, startGeneration } = useStreamingGeneration({
     onChunk: (chunk) => {
@@ -287,6 +292,13 @@ export function Create() {
     // TODO: integrate with publish pipeline
   }, [isGenerating, cancel])
 
+  // Version rollback handler
+  const handleVersionRollback = useCallback((newTitle: string, newBody: string) => {
+    setTitle(newTitle)
+    setEditorContent(newBody)
+    setIsSaved(false)
+  }, [])
+
   // Generate from topic — now routes through variant picker
   const handleGenerateFromTopic = useCallback(
     (topic: string) => {
@@ -360,6 +372,15 @@ export function Create() {
           <Save size={12} />
           <span>{isSaved ? '\u5df2\u4fdd\u5b58' : '\u672a\u4fdd\u5b58'}</span>
         </div>
+
+        {/* Version history button */}
+        <button
+          onClick={() => setIsVersionHistoryOpen(true)}
+          className="flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1 text-xs font-medium text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-700"
+        >
+          <Clock size={12} />
+          {'\u7248\u672c\u5386\u53f2'}
+        </button>
 
         {/* Platform badge */}
         <button
@@ -516,6 +537,14 @@ export function Create() {
           />
         </>
       )}
+
+      {/* Version History Panel */}
+      <VersionHistory
+        contentId={currentContentId}
+        isOpen={isVersionHistoryOpen}
+        onClose={() => setIsVersionHistoryOpen(false)}
+        onRollback={handleVersionRollback}
+      />
     </div>
   )
 }

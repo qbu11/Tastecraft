@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.content import ContentCreate, ContentList, ContentResponse, ContentUpdate
 from app.services.diff_engine import DiffEngine
 from app.services.pattern_extractor import PatternExtractor
+from app.services.version_manager import VersionManager
 from app.tasks.celery_app import generate_content_task, publish_content_task
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,16 @@ async def generate_content(
     db.add(content)
     await db.flush()
     await db.refresh(content)
+
+    # Auto-create initial version (v1) for the generated content
+    version_mgr = VersionManager(db)
+    await version_mgr.create_version(
+        content_id=content.id,
+        title=content.title,
+        body=content.body,
+        platform=content.platform,
+        created_by="ai_generated",
+    )
 
     task = generate_content_task.delay(content.id, payload.prompt, payload.platform)
     return {"task_id": task.id, "content_id": content.id}
@@ -72,6 +83,7 @@ async def update_content(
         raise HTTPException(status_code=404, detail="Content not found")
 
     engine = DiffEngine(db)
+    version_mgr = VersionManager(db)
     edits_captured = 0
 
     if payload.title is not None and payload.title != content.title:
@@ -98,6 +110,16 @@ async def update_content(
 
     await db.flush()
     await db.refresh(content)
+
+    # Auto-create a new version if content was edited
+    if edits_captured > 0:
+        await version_mgr.create_version(
+            content_id=content.id,
+            title=content.title,
+            body=content.body,
+            platform=content.platform,
+            created_by="user_edited",
+        )
 
     # Trigger pattern extraction if threshold reached
     if edits_captured > 0:

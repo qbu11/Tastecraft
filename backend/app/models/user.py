@@ -22,3 +22,6 @@ class User(Base):
     analytics_entries: Mapped[list["Analytics"]] = relationship(back_populates="user")  # noqa: F821
     notifications: Mapped[list["Notification"]] = relationship(back_populates="user")  # noqa: F821
     competitors: Mapped[list["Competitor"]] = relationship(back_populates="user")  # noqa: F821
+    subscription: Mapped["Subscription | None"] = relationship(  # noqa: F821
+        back_populates="user", uselist=False
+    )
