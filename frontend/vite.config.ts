@@ -5,7 +5,6 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: process.env.GITHUB_PAGES === 'true' ? '/Tastecraft/' : '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -13,10 +12,9 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8100',
-      '/ws': {
-        target: 'http://localhost:8100',
-        ws: true,
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
       },
     },
   },

@@ -1,34 +1,60 @@
-# Crew Media Ops — 开发进度
+# TasteCraft — 开发进度
 
 > 项目开发里程碑和当前状态追踪。
 
 ---
 
-## 当前版本：v1.2
+## 当前版本：v2.0 — TasteCraft Self-Use Edition
 
-### 最新进展（2026-03-31）
+### 最新进展（2026-04-13）
 
-**Taste Onboarding 系统**
-- OnboardingAgent：6 步引导流程（领域/调性/平台/长度/开场/避免）
-- API 端点：`/api/v1/onboarding/*`（start、answer、taste-prompt）
-- TasteEngine 集成：偏好自动注入内容生成流程
-- 置信度系统：基于信号数量计算各维度置信度
+**架构转型：Multi-Agent → Single Agent + Multi Tool**
+- 放弃 CrewAI 多 Agent 架构，改用 Anthropic SDK agent loop
+- CLI-first（Typer + Rich），砍掉 Web Dashboard
+- 单用户多 Project 隔离，SQLite 持久化
+- 五条自动化 Pipeline：Content / Publish / Analytics / Evolution / Trending
 
-**4-Subagent 工作流**
-- ContentOrchestrator 编排 4 个子 Agent 顺序执行
-- Researcher → Marketer → Copywriter → Designer
-- CallbackHandler 通过 WebSocket 实时推送执行状态
-- 前端 SubagentWorkflow 组件可视化工作流进度
+**TasteCraft Self-Use Edition 已完成 Phase 1-6**
+- Phase 1: Foundation — CLI skeleton + agent loop + project management
+- Phase 2: Content Pipeline — 生成 + 审核 + REPL 交互模式
+- Phase 3: Publish Pipeline — 小红书 + 微信公众号发布工具
+- Phase 4: Analytics + Evolution — 数据收集 + 品味进化 + 调度
+- Phase 5: CLI Polish — run/schedule/daemon 命令 + trending pipeline
+- Phase 6: Search Enhancement — 搜索鲁棒性、平台修复、daemon、REPL、测试
 
-**前端 Dashboard**
-- React + Vite + TailwindCSS
-- 12 个页面：Dashboard、Crews、Content Create、Drafts、Review、Analytics、Agents、Publish、Search、Clients、Images、Tasks
-- WebSocket 实时状态更新
-- Zustand 状态管理
+**代码结构（`src/tastecraft/`）**
+- `cli/` — Typer CLI 入口 + REPL + 子命令（generate/publish/project/taste/daemon/run/schedule）
+- `core/` — agent_loop、config、logging
+- `pipelines/` — content、publish、analytics、evolution、trending
+- `tools/` — search、content、notification、platform（xiaohongshu/wechat）
+- `taste/` — profile、prompt_builder
+- `models/` — SQLite 表定义
+- `services/` — scheduler
+
+**Bug 修复**
+- daemon base_dir → home_dir 路径修复
+- agent_loop API 错误处理
+- 搜索部分结果返回 + RSS 超时 + feedparser 依赖
+- Publish→Analytics→Evolution 数据管道疏通
+- AdaptPlatformTool body 校验边界情况
 
 ---
 
 ## 里程碑
+
+### v2.0 — TasteCraft Self-Use Edition（2026-04-13）✅
+
+| 功能 | 状态 |
+|------|------|
+| Phase 1: CLI skeleton + agent loop + project mgmt | ✅ 完成 |
+| Phase 2: Content Pipeline + REPL | ✅ 完成 |
+| Phase 3: Publish Pipeline（XHS + WeChat） | ✅ 完成 |
+| Phase 4: Analytics + Evolution + Scheduling | ✅ 完成 |
+| Phase 5: CLI polish + daemon + trending | ✅ 完成 |
+| Phase 6: Search enhancement + platform fixes | ✅ 完成 |
+| 数据管道疏通（Publish→Analytics→Evolution） | ✅ 修复 |
+| Daemon 路径 + agent_loop 错误处理 | ✅ 修复 |
+| 搜索鲁棒性（partial results, RSS timeout） | ✅ 修复 |
 
 ### v1.2 — Taste + Workflow（2026-03-31）✅
 
@@ -67,8 +93,10 @@
 
 ## 待开发
 
-- [ ] Onboarding 前端页面（OnboardingPage.tsx）
-- [ ] 稿件反馈闭环（approve/reject → TasteEngine 学习）
-- [ ] 数据分析 Agent 真实数据采集
-- [ ] PostgreSQL 迁移
-- [ ] 多用户/多账号支持
+- [ ] 端到端实际运行验证（真实 API key + 真实平台 cookie）
+- [ ] 多 Project 并行运行测试
+- [ ] Cron 调度生产环境验证
+- [ ] 品味进化效果评估（Evolution Pipeline 实际反馈循环）
+- [ ] 更多平台支持（微博、知乎、抖音、B站 → TasteCraft 架构适配）
+- [ ] PostgreSQL 迁移（当 SQLite 不够用时）
+- [ ] 内容质量评分自动化（替代人工审核）

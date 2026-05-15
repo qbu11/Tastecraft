@@ -1,1 +1,0 @@
-"""TasteCraft Pydantic schemas."""
